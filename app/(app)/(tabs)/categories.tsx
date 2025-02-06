@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
   StyleSheet,
@@ -18,6 +18,11 @@ import { router } from "expo-router";
 import { useCategories, type Category } from "@/hooks/useCategories";
 import { LinearGradient } from "expo-linear-gradient";
 import { adjustColor } from "@/lib/utils/colors";
+import { AICategoryAssistant } from "@/features/ai/components/AICategoryAssistant";
+import { supabase } from "@/lib/supabase/supabaseClient";
+import { AICategoryCreator } from "@/features/ai/components/AICategoryCreator";
+import { useUser } from "../../../hooks/useUser";
+import { PremiumStatus } from "@/components/PremiumStatus";
 
 const { width } = Dimensions.get("window");
 const COLUMN_COUNT = 2;
@@ -27,10 +32,109 @@ const CARD_WIDTH = (width - SPACING * (COLUMN_COUNT + 1)) / COLUMN_COUNT;
 export default function CategoriesScreen() {
   const theme = useTheme();
   const { categories, loading, error, refetch } = useCategories();
+  const { user, isPremium, loading: userLoading } = useUser();
+  const [canAccessAI, setCanAccessAI] = useState(false);
+
+  // Add function to refresh premium status
+  const refreshPremiumStatus = useCallback(async () => {
+    console.log("[Categories] Refreshing premium status");
+    // Force a re-render by toggling state
+    setCanAccessAI(false);
+    // Small delay to ensure state updates
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    setCanAccessAI(Boolean(isPremium));
+  }, [isPremium]);
+
+  useEffect(() => {
+    console.log("[Categories] Premium status changed:", isPremium);
+    setCanAccessAI(Boolean(isPremium));
+  }, [isPremium]);
 
   const handleRefresh = useCallback(() => {
     refetch();
   }, [refetch]);
+
+  const handleCreateWithAI = async (categoryData: {
+    name: string;
+    description: string;
+    color: string;
+    flashcards: Array<{ term: string; definition: string }>;
+  }) => {
+    try {
+      // Get user ID first
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("User not found");
+
+      // First create the category
+      const { data: category, error: categoryError } = await supabase
+        .from("categories")
+        .insert([
+          {
+            name: categoryData.name,
+            description: categoryData.description,
+            color: categoryData.color,
+            user_id: user.id,
+          },
+        ])
+        .select()
+        .single();
+
+      if (categoryError) throw categoryError;
+
+      // Then create all flashcards
+      const { error: flashcardsError } = await supabase
+        .from("flashcards")
+        .insert(
+          categoryData.flashcards.map((card) => ({
+            category_id: category.id,
+            user_id: user.id,
+            term: card.term,
+            definition: card.definition,
+          }))
+        );
+
+      if (flashcardsError) throw flashcardsError;
+
+      // Refresh the categories list
+      await refetch();
+
+      // Navigate to the new category
+      router.push({
+        pathname: `/(app)/category/${category.id}`,
+        params: {
+          animation: "slide_from_right",
+        },
+      });
+    } catch (error) {
+      console.error("Error creating category with AI:", error);
+      throw error;
+    }
+  };
+
+  const handleAICreate = async () => {
+    console.log(
+      "[Categories] Handling AI create. Premium status:",
+      canAccessAI
+    );
+
+    // Refresh premium status before checking
+    await refreshPremiumStatus();
+
+    if (user && canAccessAI) {
+      console.log("[Categories] Routing to AI chat");
+      router.push({
+        pathname: "/(app)/ai-chat",
+        params: {
+          animation: "slide_from_bottom",
+        },
+      });
+    } else {
+      console.log("[Categories] Routing to subscription");
+      router.push("/(app)/premium/subscribe");
+    }
+  };
 
   if (loading && !categories.length) {
     return (
@@ -61,6 +165,7 @@ export default function CategoriesScreen() {
       end={{ x: 1, y: 1 }}
       style={styles.container}
     >
+      <PremiumStatus />
       <View style={styles.header}>
         <Text variant="headlineMedium" style={styles.title}>
           Browse all
@@ -127,13 +232,34 @@ export default function CategoriesScreen() {
         }
       />
 
-      <FAB
-        icon="plus"
-        style={[styles.fab, { backgroundColor: "rgba(255,255,255,0.15)" }]}
-        onPress={() => router.push("/(app)/category/create")}
-        label="Add Category"
-        color="white"
-      />
+      <View style={styles.fabContainer}>
+        <FAB
+          icon="robot"
+          style={[
+            styles.fab,
+            styles.aiFab,
+            { backgroundColor: "rgba(255,255,255,0.15)" },
+          ]}
+          onPress={async () => {
+            console.log("[Categories] FAB pressed. Current status:", {
+              user: Boolean(user),
+              premium: canAccessAI,
+              loading: userLoading,
+            });
+            await handleAICreate();
+          }}
+          label="AI Create"
+          color="white"
+          disabled={userLoading}
+        />
+        <FAB
+          icon="plus"
+          style={[styles.fab, { backgroundColor: "rgba(255,255,255,0.15)" }]}
+          onPress={() => router.push("/(app)/category/create")}
+          label="Add Category"
+          color="white"
+        />
+      </View>
     </LinearGradient>
   );
 }
@@ -191,12 +317,19 @@ const styles = StyleSheet.create({
     letterSpacing: 0.75,
     paddingHorizontal: 16,
   },
-  fab: {
+  fabContainer: {
     position: "absolute",
-    margin: 16,
-    right: 0,
-    bottom: 0,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    bottom: 16,
+    left: 16,
+    right: 16,
+  },
+  fab: {
     borderRadius: 28,
+  },
+  aiFab: {
+    backgroundColor: "rgba(147, 51, 234, 0.3)", // Slight purple tint for AI button
   },
   emptyContainer: {
     alignItems: "center",

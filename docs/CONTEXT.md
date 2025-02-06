@@ -161,3 +161,76 @@ AI Processing: DeepSeek
 - role: string
 
 ## Project Structure
+
+FlashMind/
+├── app/ # Expo Router pages
+│ ├── (auth)/ # Authentication routes
+│ └── (app)/ # Main app routes
+├── assets/ # Static assets
+├── components/ # Reusable components
+├── config/ # Configuration files
+├── constants/ # App constants
+├── docs/ # Documentation
+├── features/ # Feature-specific code
+│ └── ai/ # AI-related features
+│ ├── services/ # AI services
+│ ├── hooks/ # AI hooks
+│ └── config/ # AI configuration
+├── lib/ # Core libraries
+├── types/ # TypeScript types
+└── utils/ # Utility functions
+
+# FlashMind Project Structure
+
+## Core Features
+
+- `/app` - Main application screens and navigation
+  - `/(app)` - Protected app routes
+    - `/(tabs)` - Bottom tab navigation screens
+    - `/admin` - Admin-only screens (development)
+    - `/premium` - Premium subscription screens
+  - `/auth` - Authentication screens
+
+## Features
+
+- `/features` - Feature-based modules
+  - `/ai` - AI-powered features
+    - `/components`
+      - `AIFlashcardEditor.tsx` - AI assistance for flashcard creation
+      - `AICategoryAssistant.tsx` - AI assistance for category creation
+    - `/hooks`
+      - `useDeepseekAI.ts` - Hook for AI API interactions
+      - `useFlashcardAI.ts` - Hook for flashcard-specific AI features
+    - `/types`
+      - `index.ts` - AI feature type definitions
+  - `/auth` - Authentication
+    - `/hooks`
+    - `/components`
+  - `/premium` - Premium features
+    - `/components`
+      - `PremiumFeature.tsx` - Premium feature wrapper
+    - `/constants`
+      - `pricing.ts` - Subscription plan definitions
+    - `/hooks`
+      - `useSubscription.ts` - Subscription management hook
+    - `/services`
+      - `subscriptionService.ts` - Subscription API service
+      - `premiumManagementService.ts` - Premium status management
+
+## Libraries and Utils
+
+- `/lib` - Shared libraries and utilities
+  - `/supabase` - Supabase client and utilities
+  - `/utils` - Helper functions
+
+## Components
+
+- `/components` - Shared UI components
+  - `HeaderBar.tsx`
+  - Other reusable components...
+
+## Documentation
+
+- `/docs` - Project documentation
+  - `CONTEXT.md` - Project structure and context
+  - Other documentation files...

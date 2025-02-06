@@ -196,7 +196,11 @@ export default function SignInScreen() {
       if (error) throw error;
 
       // Save persist state if "keep me logged in" is checked
-      await authStorage.setPersist(keepLoggedIn);
+      if (keepLoggedIn) {
+        await authStorage.setPersist(true);
+      } else {
+        await authStorage.setPersist(false);
+      }
 
       router.replace("/(app)");
     } catch (e) {

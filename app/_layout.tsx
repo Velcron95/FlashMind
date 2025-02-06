@@ -1,35 +1,70 @@
 import { useEffect } from "react";
-import { Stack, Slot, router } from "expo-router";
+import { Stack } from "expo-router";
 import { useColorScheme } from "react-native";
 import { PaperProvider, MD3DarkTheme, MD3LightTheme } from "react-native-paper";
-import { supabase } from "@/lib/supabase/supabaseClient";
+import { getInitialSession } from "@/lib/supabase/supabaseClient";
+import { AuthProvider } from "../features/auth/context/AuthContext";
+import * as SplashScreen from "expo-splash-screen";
+import { LogBox } from "react-native";
 import { authStorage } from "@/lib/utils/authStorage";
+import { supabase } from "@/lib/supabase/supabaseClient";
+import { router } from "expo-router";
+
+// Keep the splash screen visible while we fetch resources
+SplashScreen.preventAutoHideAsync();
+
+// Ignore specific warnings if needed
+LogBox.ignoreLogs([
+  "Non-serializable values were found in the navigation state",
+]);
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   useEffect(() => {
-    checkSession();
+    const setupApp = async () => {
+      try {
+        console.log("[Navigation] App starting...");
+
+        // Check if user wants to stay logged in
+        const isPersisted = await authStorage.getPersist();
+        if (isPersisted) {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+          if (session) {
+            console.log("[Auth] Session found, redirecting to app");
+            router.replace("/(app)");
+          } else {
+            console.log("[Auth] No session found, redirecting to login");
+            router.replace("/auth/sign-in");
+          }
+        } else {
+          console.log("[Auth] No persistence requested, redirecting to login");
+          router.replace("/auth/sign-in");
+        }
+
+        await SplashScreen.hideAsync();
+      } catch (error) {
+        console.error("[Navigation] Setup error:", error);
+        router.replace("/auth/sign-in");
+      }
+    };
+
+    setupApp();
   }, []);
 
-  const checkSession = async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const isPersisted = await authStorage.getPersist();
-
-    if (session && isPersisted) {
-      router.replace("/(app)");
-    } else if (!session) {
-      router.replace("/auth/sign-in");
-    }
-  };
-
   return (
-    <PaperProvider
-      theme={colorScheme === "dark" ? MD3DarkTheme : MD3LightTheme}
-    >
-      <Slot />
-    </PaperProvider>
+    <AuthProvider>
+      <PaperProvider
+        theme={colorScheme === "dark" ? MD3DarkTheme : MD3LightTheme}
+      >
+        <Stack>
+          <Stack.Screen name="(app)" options={{ headerShown: false }} />
+          <Stack.Screen name="auth" options={{ headerShown: false }} />
+          <Stack.Screen name="admin" options={{ headerShown: false }} />
+        </Stack>
+      </PaperProvider>
+    </AuthProvider>
   );
 }

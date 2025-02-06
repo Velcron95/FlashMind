@@ -3,19 +3,51 @@ import { View, StyleSheet } from "react-native";
 import { Text, IconButton } from "react-native-paper";
 import { LinearGradient } from "expo-linear-gradient";
 import { supabase } from "@/lib/supabase/supabaseClient";
+import { Link } from "expo-router";
+import { PremiumManagementService } from "@/features/premium/services/premiumManagementService";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
+import { authStorage } from "@/lib/utils/authStorage";
 
 export default function HeaderBar() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     fetchUser();
   }, []);
 
   const fetchUser = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    setUserEmail(user?.email || null);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      console.log("[HeaderBar] Current user:", user?.id);
+
+      if (user) {
+        setUserEmail(user.email || null);
+        // Add debug logs for admin check
+        const isAdmin = await PremiumManagementService.isUserAdmin(user.id);
+        console.log("[HeaderBar] Admin check result:", isAdmin);
+        setIsAdmin(isAdmin);
+      }
+    } catch (error) {
+      console.error("[HeaderBar] Error fetching user:", error);
+      setUserEmail(null);
+      setIsAdmin(false);
+    }
+  };
+
+  const clearSession = async () => {
+    try {
+      await supabase.auth.signOut();
+      // Only clear auth-related data, not everything
+      await authStorage.clear(); // This is our custom auth storage
+      router.replace("/auth/sign-in");
+    } catch (error) {
+      console.error("Error clearing session:", error);
+    }
   };
 
   return (
@@ -31,8 +63,24 @@ export default function HeaderBar() {
           <Text style={styles.email} numberOfLines={1}>
             {userEmail || "Loading..."}
           </Text>
-          <IconButton icon="account-circle" iconColor="white" size={24} />
+          <IconButton
+            icon="account-circle"
+            iconColor="white"
+            size={24}
+            onPress={clearSession}
+          />
         </View>
+        {/* Only show admin icon if user is actually an admin */}
+        {isAdmin && (
+          <Link href="/admin/premium-management" asChild>
+            <IconButton
+              icon="shield-crown"
+              size={24}
+              iconColor="white" // Make sure icon is visible
+              onPress={() => {}}
+            />
+          </Link>
+        )}
       </View>
     </LinearGradient>
   );

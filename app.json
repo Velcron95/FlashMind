@@ -1,9 +1,9 @@
 {
   "expo": {
-    "scheme": "acme",
-    "plugins": ["expo-router"],
+    "scheme": "flashmind",
+    "plugins": ["expo-router", "expo-secure-store"],
     "name": "FlashMind",
-    "slug": "FlashMind",
+    "slug": "flashmind",
     "newArchEnabled": true
   }
 }

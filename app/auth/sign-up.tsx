@@ -74,7 +74,6 @@ export default function SignUpScreen() {
         password: password.trim(),
         options: {
           data: { email: email.trim() },
-          emailRedirectTo: window.location.origin,
         },
       });
 

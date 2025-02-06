@@ -1,31 +1,32 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const AUTH_KEY = "@auth_persist";
+const AUTH_PERSIST_KEY = "auth-persist";
+const AUTH_SESSION_KEY = "supabase.auth.token";
 
 export const authStorage = {
-  async setPersist(persist: boolean) {
+  getPersist: async () => {
     try {
-      await AsyncStorage.setItem(AUTH_KEY, JSON.stringify(persist));
-    } catch (error) {
-      console.error("Error saving auth state:", error);
-    }
-  },
-
-  async getPersist(): Promise<boolean> {
-    try {
-      const value = await AsyncStorage.getItem(AUTH_KEY);
-      return value ? JSON.parse(value) : false;
-    } catch (error) {
-      console.error("Error getting auth state:", error);
+      const value = await AsyncStorage.getItem(AUTH_PERSIST_KEY);
+      return value === "true";
+    } catch (e) {
       return false;
     }
   },
 
-  async clear() {
+  setPersist: async (value: boolean) => {
     try {
-      await AsyncStorage.removeItem(AUTH_KEY);
-    } catch (error) {
-      console.error("Error clearing auth state:", error);
+      await AsyncStorage.setItem(AUTH_PERSIST_KEY, value.toString());
+    } catch (e) {
+      console.error("Error setting persist:", e);
+    }
+  },
+
+  clear: async () => {
+    try {
+      // Only clear auth-related keys
+      await AsyncStorage.multiRemove([AUTH_PERSIST_KEY, AUTH_SESSION_KEY]);
+    } catch (e) {
+      console.error("Error clearing auth storage:", e);
     }
   },
 };
