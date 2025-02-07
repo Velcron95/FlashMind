@@ -13,9 +13,12 @@ import { supabase } from "@/lib/supabase/supabaseClient";
 import ColorPicker from "./ColorPicker";
 import { LinearGradient } from "expo-linear-gradient";
 import { generateRandomColor } from "@/lib/utils/colors";
+import { useCategoriesStore } from "@/stores/categoriesStore";
 
 export function RegularCategoryCreator() {
+  const { addCategory } = useCategoriesStore();
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [color, setColor] = useState(generateRandomColor());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,11 +38,14 @@ export function RegularCategoryCreator() {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      await db.categories.create({
+      const newCategory = await db.categories.create({
         name: name.trim(),
         color,
         user_id: user.id,
       });
+
+      // Update store immediately
+      addCategory(newCategory);
 
       router.back();
     } catch (err) {
@@ -93,6 +99,28 @@ export function RegularCategoryCreator() {
                 disabled={loading}
                 left={
                   <TextInput.Icon icon="folder" color="rgba(255,255,255,0.9)" />
+                }
+                textColor="white"
+                theme={{
+                  colors: {
+                    onSurfaceVariant: "rgba(255,255,255,0.9)",
+                    placeholder: "rgba(255,255,255,0.5)",
+                  },
+                }}
+                contentStyle={styles.inputContent}
+                underlineColor="rgba(255,255,255,0.2)"
+                activeUnderlineColor="white"
+              />
+
+              <TextInput
+                label="Description"
+                value={description}
+                onChangeText={setDescription}
+                mode="flat"
+                style={styles.input}
+                disabled={loading}
+                left={
+                  <TextInput.Icon icon="text" color="rgba(255,255,255,0.9)" />
                 }
                 textColor="white"
                 theme={{

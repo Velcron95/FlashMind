@@ -4,6 +4,7 @@
     "plugins": ["expo-router", "expo-secure-store"],
     "name": "FlashMind",
     "slug": "flashmind",
-    "newArchEnabled": true
+    "newArchEnabled": true,
+    "icon": "assets/icon.png"
   }
 }

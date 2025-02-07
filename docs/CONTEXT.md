@@ -80,13 +80,13 @@ AI Processing: DeepSeek
 ### Premium Tier
 
 - Full AI-powered feature set
+- Maximum 100 flashcards per category
+- Maximum 200 API tokens per month
 - Unlimited flashcards and categories
-- Advanced progress tracking
+- Users can put in their notes to make ai flashcards
 - Ad-free experience
-- Personalized study recommendations
+
 - Monthly or yearly subscription options
-- Advanced collaboration features
-- Complete cross-device sync
 
 ## Database Schema
 
@@ -144,21 +144,6 @@ AI Processing: DeepSeek
 - achievement_type: string
 - achieved_at: timestamp
 - metadata: jsonb
-
-#### study_groups
-
-- id: uuid (PK)
-- name: string
-- created_by: uuid (FK -> users.id)
-- created_at: timestamp
-- description: text
-
-#### group_members
-
-- group_id: uuid (FK -> study_groups.id)
-- user_id: uuid (FK -> users.id)
-- joined_at: timestamp
-- role: string
 
 ## Project Structure
 
@@ -234,3 +219,69 @@ FlashMind/
 - `/docs` - Project documentation
   - `CONTEXT.md` - Project structure and context
   - Other documentation files...
+
+## Learning Flow
+
+### Study Modes
+
+#### 1. Review Mode (Default)
+
+- Classic flashcard experience with intuitive gestures
+- Tap to reveal answer
+- Swipe right for correct, left for incorrect
+- Progress tracking and performance metrics
+- Available to all users
+
+#### 5. Random Mode
+
+- Cross-category learning
+
+### Learning Process Flow
+
+1. **Category Selection**
+
+   - Browse personal categories
+
+   - View progress indicators
+
+2. **Mode Selection**
+
+   - Choose preferred study mode
+   - Set session duration
+   - Configure mode-specific settings
+   - View mode recommendations (Premium)
+
+3. **Study Session**
+
+   - Active recall practice
+   - Performance tracking
+   - Real-time feedback
+   - Progress indicators
+   - Streak monitoring
+
+4. **Session Summary**
+
+   - Detailed performance metrics
+   - ✅ Correct/incorrect ratio
+   - ⏱️ Time per card analysis
+   - 📊 Progress visualization
+   - 🎯 Achievement updates
+
+### Enhanced Features
+
+#### Accessibility
+
+- Customizable text sizing
+- Text-to-speech support
+- High contrast modes
+- Gesture customization (swipe, tap, etc.)
+
+#### Gamification
+
+- Daily/weekly streaks
+- Achievement system
+- Progress milestones
+
+#### after you create a file add it in the context.md file so you know the directory structure
+
+This learning flow is designed to maximize engagement and effectiveness while providing flexibility for different learning styles and needs. The premium features enhance the experience through AI-powered personalization and advanced analytics.

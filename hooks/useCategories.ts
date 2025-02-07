@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { db } from "@/lib/supabase/db";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase/supabaseClient";
 
 export interface Category {
@@ -15,18 +14,16 @@ export function useCategories() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Get the current user
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Get categories for the current user
       const { data, error } = await supabase
         .from("categories")
         .select("*")
@@ -36,19 +33,67 @@ export function useCategories() {
       if (error) throw error;
 
       setCategories(data || []);
+      return data || [];
     } catch (e) {
-      console.error("Error fetching categories:", e);
       setError(
         e instanceof Error ? e : new Error("Failed to fetch categories")
       );
+      return [];
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchCategories();
   }, []);
+
+  // Set up realtime subscription
+  useEffect(() => {
+    let isMounted = true;
+    let retryCount = 0;
+    const maxRetries = 3;
+
+    const fetchWithRetry = async () => {
+      try {
+        await fetchCategories();
+      } catch (error) {
+        if (retryCount < maxRetries) {
+          retryCount++;
+          setTimeout(fetchWithRetry, 1000 * retryCount);
+        }
+      }
+    };
+
+    const setupSubscription = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      return supabase
+        .channel(`categories-${user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "categories",
+            filter: `user_id=eq.${user.id}`,
+          },
+          async () => {
+            if (isMounted) {
+              await fetchWithRetry();
+            }
+          }
+        )
+        .subscribe();
+    };
+
+    fetchWithRetry();
+    const subscription = setupSubscription();
+
+    return () => {
+      isMounted = false;
+      subscription.then((sub) => sub?.unsubscribe());
+    };
+  }, [fetchCategories]);
 
   return {
     categories,

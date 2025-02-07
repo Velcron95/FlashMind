@@ -77,16 +77,34 @@ export const db = {
     },
 
     async create(
-      category: Database["public"]["Tables"]["categories"]["Insert"]
+      category: Database["public"]["Tables"]["categories"]["Insert"],
+      flashcards?: Array<{ term: string; definition: string }>
     ) {
-      const { data, error } = await supabase
+      const { data: newCategory, error: categoryError } = await supabase
         .from("categories")
         .insert(category)
         .select()
         .single();
 
-      if (error) throw error;
-      return data;
+      if (categoryError) throw categoryError;
+
+      // If flashcards are provided, create them
+      if (flashcards && flashcards.length > 0) {
+        const { error: flashcardsError } = await supabase
+          .from("flashcards")
+          .insert(
+            flashcards.map((card) => ({
+              category_id: newCategory.id,
+              user_id: category.user_id,
+              term: card.term,
+              definition: card.definition,
+            }))
+          );
+
+        if (flashcardsError) throw flashcardsError;
+      }
+
+      return newCategory;
     },
 
     async delete(id: string) {
