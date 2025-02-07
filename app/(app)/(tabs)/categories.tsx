@@ -40,7 +40,19 @@ const COLUMN_COUNT = 2;
 const SPACING = 12;
 const CARD_WIDTH = (width - SPACING * (COLUMN_COUNT + 1)) / COLUMN_COUNT;
 
-export default function CategoriesScreen() {
+/**
+ * CategoryBrowserScreen - Main category management screen
+ * Route: /(tabs)/categories
+ *
+ * Features:
+ * - Grid view of all user's categories
+ * - Create new categories (manual or AI-assisted)
+ * - Edit/delete existing categories
+ * - Navigate to category details
+ * - Premium features integration
+ * - Real-time updates via Supabase
+ */
+export default function CategoryBrowserScreen() {
   const theme = useTheme();
   const { user, isPremium, loading: userLoading } = useUser();
   const [canAccessAI, setCanAccessAI] = useState(false);

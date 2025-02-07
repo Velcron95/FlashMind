@@ -1,3 +1,5 @@
+import type { CardType } from "@/features/cards/types/cards";
+
 export interface Profile {
   id: string;
   email: string;
@@ -10,9 +12,9 @@ export interface Profile {
 
 export interface Category {
   id: string;
-  user_id: string;
   name: string;
   color: string;
+  user_id: string;
   created_at: string;
   updated_at: string;
 }
@@ -20,14 +22,20 @@ export interface Category {
 export interface Flashcard {
   id: string;
   user_id: string;
-  category_id: string | null;
-  term: string;
-  definition: string;
+  category_id: string;
+  card_type: CardType;
+  term: string | null;
+  definition: string | null;
+  statement: string | null;
+  question: string | null;
+  options: string[] | null;
+  correct_answer: string | null;
   is_learned: boolean;
   times_reviewed: number;
   last_reviewed: string | null;
   created_at: string;
   updated_at: string;
+  difficulty_level: number;
 }
 
 export interface StudySession {
@@ -58,9 +66,29 @@ export interface Database {
         Update: Partial<Omit<Category, "id" | "user_id">>;
       };
       flashcards: {
-        Row: Flashcard;
-        Insert: Omit<Flashcard, "id" | "created_at" | "updated_at">;
-        Update: Partial<Omit<Flashcard, "id" | "user_id">>;
+        Row: {
+          id: string;
+          user_id: string;
+          category_id: string;
+          card_type: CardType;
+          term: string | null;
+          definition: string | null;
+          statement: string | null;
+          question: string | null;
+          options: string[] | null;
+          correct_answer: string | null;
+          is_learned: boolean;
+          times_reviewed: number;
+          last_reviewed: string | null;
+          created_at: string;
+          updated_at: string;
+          difficulty_level: number;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["flashcards"]["Row"],
+          "id" | "created_at" | "updated_at"
+        >;
+        Update: Partial<Database["public"]["Tables"]["flashcards"]["Insert"]>;
       };
       study_sessions: {
         Row: StudySession;

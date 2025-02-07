@@ -1,5 +1,14 @@
 import { supabase } from "./supabaseClient";
 import type { Database } from "../../types/database";
+import type {
+  ClassicCard,
+  TrueFalseCard,
+  MultipleChoiceCard,
+  CardType,
+  Flashcard,
+} from "@/features/cards/types/cards";
+
+type CreateFlashcardData = Omit<Flashcard, "id" | "created_at" | "updated_at">;
 
 export const db = {
   flashcards: {
@@ -24,17 +33,38 @@ export const db = {
       return data;
     },
 
-    async create(
-      flashcard: Database["public"]["Tables"]["flashcards"]["Insert"]
-    ) {
-      const { data, error } = await supabase
-        .from("flashcards")
-        .insert(flashcard)
-        .select()
-        .single();
+    async create(cardData: CreateFlashcardData) {
+      console.log("[DB] Creating flashcard:", {
+        type: cardData.card_type,
+        data: cardData,
+      });
 
-      if (error) throw error;
-      return data;
+      try {
+        const { data, error } = await supabase
+          .from("flashcards")
+          .insert(cardData)
+          .select()
+          .single();
+
+        if (error) {
+          console.error("[DB] Error creating flashcard:", {
+            error,
+            cardType: cardData.card_type,
+            categoryId: cardData.category_id,
+          });
+          throw error;
+        }
+
+        console.log("[DB] Flashcard created successfully:", {
+          id: data.id,
+          type: data.card_type,
+        });
+
+        return data;
+      } catch (err) {
+        console.error("[DB] Unexpected error in create flashcard:", err);
+        throw err;
+      }
     },
 
     async update(
@@ -96,6 +126,7 @@ export const db = {
             flashcards.map((card) => ({
               category_id: newCategory.id,
               user_id: category.user_id,
+              card_type: "classic",
               term: card.term,
               definition: card.definition,
             }))

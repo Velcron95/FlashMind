@@ -7,7 +7,7 @@ import { AuthChangeEvent, Session } from "@supabase/supabase-js";
 // Log environment variables (without the key)
 console.log("[Supabase] Checking configuration...");
 
-// Use environment variables directly
+// Use process.env instead of @env
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 

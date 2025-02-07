@@ -18,6 +18,10 @@ LogBox.ignoreLogs([
   "Non-serializable values were found in the navigation state",
 ]);
 
+export const unstable_settings = {
+  initialRouteName: "(tabs)",
+};
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 
@@ -59,7 +63,7 @@ export default function RootLayout() {
       <PaperProvider
         theme={colorScheme === "dark" ? MD3DarkTheme : MD3LightTheme}
       >
-        <Stack>
+        <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(app)" options={{ headerShown: false }} />
           <Stack.Screen name="auth" options={{ headerShown: false }} />
           <Stack.Screen name="admin" options={{ headerShown: false }} />

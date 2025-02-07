@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, Pressable } from "react-native";
 import { Text, IconButton } from "react-native-paper";
 import { LinearGradient } from "expo-linear-gradient";
 import { supabase } from "@/lib/supabase/supabaseClient";
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { PremiumManagementService } from "@/features/premium/services/premiumManagementService";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter } from "expo-router";
-import { authStorage } from "@/lib/utils/authStorage";
 
 export default function HeaderBar() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -27,7 +24,6 @@ export default function HeaderBar() {
 
       if (user) {
         setUserEmail(user.email || null);
-        // Add debug logs for admin check
         const isAdmin = await PremiumManagementService.isUserAdmin(user.id);
         console.log("[HeaderBar] Admin check result:", isAdmin);
         setIsAdmin(isAdmin);
@@ -39,17 +35,6 @@ export default function HeaderBar() {
     }
   };
 
-  const clearSession = async () => {
-    try {
-      await supabase.auth.signOut();
-      // Only clear auth-related data, not everything
-      await authStorage.clear(); // This is our custom auth storage
-      router.replace("/auth/sign-in");
-    } catch (error) {
-      console.error("Error clearing session:", error);
-    }
-  };
-
   return (
     <LinearGradient
       colors={["rgba(255,255,255,0.2)", "rgba(255,255,255,0.1)"]}
@@ -58,7 +43,9 @@ export default function HeaderBar() {
       style={styles.container}
     >
       <View style={styles.content}>
-        <Text style={styles.title}>FlashMind</Text>
+        <Pressable onPress={() => router.push("/(app)")}>
+          <Text style={styles.title}>FlashMind</Text>
+        </Pressable>
         <View style={styles.userSection}>
           <Text style={styles.email} numberOfLines={1}>
             {userEmail || "Loading..."}
@@ -67,16 +54,15 @@ export default function HeaderBar() {
             icon="account-circle"
             iconColor="white"
             size={24}
-            onPress={clearSession}
+            onPress={() => router.push("/(app)/profile")}
           />
         </View>
-        {/* Only show admin icon if user is actually an admin */}
         {isAdmin && (
           <Link href="/admin/premium-management" asChild>
             <IconButton
               icon="shield-crown"
               size={24}
-              iconColor="white" // Make sure icon is visible
+              iconColor="white"
               onPress={() => {}}
             />
           </Link>
@@ -88,7 +74,7 @@ export default function HeaderBar() {
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: 48, // Adjust for status bar
+    paddingTop: 48,
     paddingBottom: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,

@@ -3,6 +3,7 @@ import { Stack } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import HeaderBar from "@/components/HeaderBar";
 import { useAuth } from "../../features/auth/hooks/useAuth";
+import type { NavigationState } from "@react-navigation/native";
 
 export default function AppLayout() {
   const { user } = useAuth();
@@ -34,10 +35,9 @@ export default function AppLayout() {
         }}
         screenListeners={{
           state: (e) => {
-            console.log("[Navigation] Tab state changed:", e.data);
-          },
-          error: (e) => {
-            console.error("[Navigation] Tab error:", e.data?.error);
+            if (e.data?.state) {
+              console.log("[Navigation] Tab state changed:", e.data.state);
+            }
           },
         }}
       >

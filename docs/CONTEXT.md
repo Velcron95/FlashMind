@@ -26,7 +26,26 @@ AI Processing: DeepSeek
 
 ### Flashcard Management
 
-- Manual creation of flashcards with terms and definitions
+- Support for multiple flashcard types:
+
+  1. **Classic Cards**
+
+     - Traditional term and definition format
+     - Front and back content
+     - Manual creation and AI assistance
+
+  2. **True/False Cards**
+
+     - Statement-based cards
+     - User marks if statement is true or false
+     - Great for fact checking and quick review
+
+  3. **Multiple Choice Cards**
+     - Question with four possible answers
+     - Drag-and-drop interface for answer selection
+     - Only one correct answer
+     - Interactive and engaging format
+
 - Category organization and tagging
 - AI-assisted definition improvements (Premium)
 - Search functionality across all categories
@@ -118,8 +137,11 @@ AI Processing: DeepSeek
 - id: uuid (PK)
 - category_id: uuid (FK -> categories.id)
 - user_id: uuid (FK -> users.id)
+- card_type: enum ('classic', 'true_false', 'multiple_choice')
 - term: string
 - definition: text
+- options: jsonb // Stores multiple choice options or true/false statement
+- correct_answer: text // For multiple choice/true-false cards
 - created_at: timestamp
 - updated_at: timestamp
 - last_reviewed: timestamp
@@ -148,22 +170,64 @@ AI Processing: DeepSeek
 ## Project Structure
 
 FlashMind/
-├── app/ # Expo Router pages
-│ ├── (auth)/ # Authentication routes
-│ └── (app)/ # Main app routes
-├── assets/ # Static assets
-├── components/ # Reusable components
-├── config/ # Configuration files
-├── constants/ # App constants
-├── docs/ # Documentation
-├── features/ # Feature-specific code
-│ └── ai/ # AI-related features
-│ ├── services/ # AI services
-│ ├── hooks/ # AI hooks
-│ └── config/ # AI configuration
-├── lib/ # Core libraries
-├── types/ # TypeScript types
-└── utils/ # Utility functions
+├── app/
+│ └── (app)/
+│ ├── (tabs)/
+│ │ ├── CategoryBrowserScreen.tsx
+│ │ ├── DashboardScreen.tsx # Main dashboard (was index.tsx)
+│ │ ├── StudyOverviewScreen.tsx # Study overview (was study.tsx)
+│ │ ├── ProfileScreen.tsx # User profile
+│ │ └── \_layout.tsx
+│ ├── category/
+│ │ └── [id]/
+│ │ └── CategoryViewScreen.tsx
+│ ├── flashcard/
+│ │ ├── create/
+│ │ │ └── [categoryId]/
+│ │ │ └── FlashcardCreatorScreen.tsx
+│ │ └── edit/
+│ │ └── [id]/
+│ │ └── FlashcardEditorScreen.tsx
+│ └── study/
+│ └── [categoryId]/
+│ └── StudySessionScreen.tsx
+├── features/
+│ └── cards/
+│ ├── components/
+│ │ ├── viewers/
+│ │ │ ├── CardViewerFactory.tsx
+│ │ │ ├── ClassicCardViewer.tsx
+│ │ │ ├── TrueFalseCardViewer.tsx
+│ │ │ └── MultiChoiceViewer.tsx
+│ │ ├── forms/
+│ │ │ ├── ClassicCardForm.tsx
+│ │ │ ├── TrueFalseCardForm.tsx
+│ │ │ └── MultiChoiceCardForm.tsx
+│ │ └── lists/
+│ │ ├── CategoryCardGrid.tsx
+│ │ └── CategoryCardSections.tsx
+│ └── types/
+│ └── cards.ts
+
+## Features
+
+- `/features` - Feature-based modules
+  - `/cards` - Card feature module
+    - `/components`
+      - `/viewers` - Card display components
+        - `CardViewerFactory.tsx` - Factory pattern for card display
+        - `ClassicCardViewer.tsx` - Traditional flashcard viewer
+        - `TrueFalseCardViewer.tsx` - True/False statement viewer
+        - `MultiChoiceViewer.tsx` - Multiple choice viewer
+      - `/forms` - Card creation/editing forms
+        - `ClassicCardForm.tsx` - Classic card form
+        - `TrueFalseCardForm.tsx` - True/False card form
+        - `MultiChoiceCardForm.tsx` - Multiple choice form
+      - `/lists` - Card list/grid components
+        - `CategoryCardGrid.tsx` - Category card grid view
+        - `CategoryCardSections.tsx` - Sectioned card list view
+    - `/types`
+      - `cards.ts` - Card type definitions
 
 # FlashMind Project Structure
 
@@ -201,6 +265,20 @@ FlashMind/
     - `/services`
       - `subscriptionService.ts` - Subscription API service
       - `premiumManagementService.ts` - Premium status management
+  - `/cards`
+    - `/components`
+      - `ClassicCard.tsx` - Traditional flashcard component
+      - `TrueFalseCard.tsx` - True/False statement cards
+      - `MultipleChoiceCard.tsx` - Multiple choice drag-drop cards
+      - `CardFactory.tsx` - Factory pattern for card creation
+    - `/hooks`
+      - `useCardInteraction.ts` - Shared card interaction logic
+      - `useDragDrop.ts` - Drag and drop functionality
+    - `/types`
+      - `cards.ts` - Card type definitions
+    - `/utils`
+      - `cardValidation.ts` - Card validation utilities
+      - `dragDropHelpers.ts` - Drag and drop helper functions
 
 ## Libraries and Utils
 

@@ -1,256 +1,130 @@
-import React, { useState, useEffect } from "react";
-import { View, StyleSheet, Animated } from "react-native";
-import {
-  Text,
-  IconButton,
-  Button,
-  ProgressBar,
-  Portal,
-  Dialog,
-  useTheme,
-} from "react-native-paper";
+import React from "react";
+import { View, StyleSheet, ScrollView } from "react-native";
+import { Text, IconButton, Card } from "react-native-paper";
 import { useLocalSearchParams, router } from "expo-router";
-import { supabase } from "../../../lib/supabase/supabaseClient";
-import FlipCard from "../../../components/FlipCard";
+import { LinearGradient } from "expo-linear-gradient";
 
-interface Flashcard {
-  id: string;
-  term: string;
-  definition: string;
-  is_learned: boolean;
-  last_reviewed?: string;
-}
+const studyMode = {
+  id: "classic",
+  title: "Basic Cards Review",
+  description:
+    "Review your basic flashcards. Tap to flip, swipe right for next card",
+  icon: "cards-outline",
+  color: "#FF6B6B",
+};
 
-export default function StudyScreen() {
-  const theme = useTheme();
+export default function StudyModeScreen() {
   const { categoryId } = useLocalSearchParams();
-  const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showCompleteDialog, setShowCompleteDialog] = useState(false);
-  const [stats, setStats] = useState({
-    learned: 0,
-    total: 0,
-  });
-
-  useEffect(() => {
-    fetchFlashcards();
-  }, [categoryId]);
-
-  const fetchFlashcards = async () => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("User not found");
-
-      let query = supabase
-        .from("flashcards")
-        .select("*")
-        .eq("user_id", user.id);
-
-      if (categoryId !== "all") {
-        query = query.eq("category_id", categoryId);
-      }
-
-      const { data, error: fetchError } = await query;
-
-      if (fetchError) throw fetchError;
-
-      // Shuffle the flashcards
-      const shuffled = data ? [...data].sort(() => Math.random() - 0.5) : [];
-      setFlashcards(shuffled);
-      setStats({
-        learned: shuffled.filter((f) => f.is_learned).length,
-        total: shuffled.length,
-      });
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load flashcards"
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleMarkLearned = async () => {
-    if (currentIndex >= flashcards.length) return;
-
-    const flashcard = flashcards[currentIndex];
-    try {
-      const { error: updateError } = await supabase
-        .from("flashcards")
-        .update({
-          is_learned: true,
-          last_reviewed: new Date().toISOString(),
-        })
-        .eq("id", flashcard.id);
-
-      if (updateError) throw updateError;
-
-      // Update local state
-      const updatedFlashcards = [...flashcards];
-      updatedFlashcards[currentIndex] = {
-        ...flashcard,
-        is_learned: true,
-      };
-      setFlashcards(updatedFlashcards);
-      setStats((prev) => ({
-        ...prev,
-        learned: prev.learned + 1,
-      }));
-
-      goToNext();
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to update flashcard"
-      );
-    }
-  };
-
-  const goToNext = () => {
-    if (currentIndex < flashcards.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-    } else {
-      setShowCompleteDialog(true);
-    }
-  };
-
-  const handleComplete = () => {
-    router.back();
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <Text>Loading flashcards...</Text>
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.centered}>
-        <Text>{error}</Text>
-        <Button
-          mode="contained"
-          onPress={() => router.back()}
-          style={styles.button}
-        >
-          Go Back
-        </Button>
-      </View>
-    );
-  }
-
-  if (flashcards.length === 0) {
-    return (
-      <View style={styles.centered}>
-        <Text>No flashcards found in this category</Text>
-        <Button
-          mode="contained"
-          onPress={() => router.back()}
-          style={styles.button}
-        >
-          Go Back
-        </Button>
-      </View>
-    );
-  }
 
   return (
-    <>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <IconButton icon="close" onPress={() => router.back()} />
-          <ProgressBar
-            progress={currentIndex / flashcards.length}
-            style={styles.progress}
-          />
-          <Text style={styles.counter}>
-            {currentIndex + 1} / {flashcards.length}
-          </Text>
-        </View>
-
-        <View style={styles.cardContainer}>
-          <FlipCard
-            front={flashcards[currentIndex].term}
-            back={flashcards[currentIndex].definition}
-          />
-        </View>
-
-        <View style={styles.actions}>
-          <Button mode="outlined" onPress={goToNext} style={styles.button}>
-            Skip
-          </Button>
-          <Button
-            mode="contained"
-            onPress={handleMarkLearned}
-            style={styles.button}
-          >
-            Learned
-          </Button>
-        </View>
+    <LinearGradient
+      colors={["#FF6B6B", "#4158D0"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.container}
+    >
+      <View style={styles.header}>
+        <IconButton
+          icon="arrow-left"
+          iconColor="white"
+          onPress={() => router.back()}
+        />
+        <Text variant="headlineMedium" style={styles.title}>
+          Study Mode
+        </Text>
       </View>
 
-      <Portal>
-        <Dialog visible={showCompleteDialog} onDismiss={handleComplete}>
-          <Dialog.Title>Study Session Complete!</Dialog.Title>
-          <Dialog.Content>
-            <Text variant="bodyLarge">
-              You've reviewed all flashcards in this session.
-            </Text>
-            <Text style={styles.stats}>
-              Learned: {stats.learned} / {stats.total}
-            </Text>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={handleComplete}>Done</Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
-    </>
+      <View style={styles.content}>
+        <Card
+          style={styles.modeCard}
+          onPress={() =>
+            router.push({
+              pathname: "/study/classic/[categoryId]",
+              params: { categoryId },
+            })
+          }
+        >
+          <LinearGradient
+            colors={[studyMode.color, "#4158D0"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.cardGradient}
+          >
+            <View style={styles.cardContent}>
+              <View style={styles.cardHeader}>
+                <View style={styles.titleContainer}>
+                  <IconButton
+                    icon={studyMode.icon}
+                    iconColor="white"
+                    size={28}
+                  />
+                  <Text style={styles.modeTitle}>{studyMode.title}</Text>
+                </View>
+              </View>
+              <Text style={styles.modeDescription}>
+                {studyMode.description}
+              </Text>
+            </View>
+          </LinearGradient>
+        </Card>
+      </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 16,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 24,
+    padding: 16,
+    paddingTop: 24,
   },
-  progress: {
+  title: {
+    color: "white",
+    fontWeight: "bold",
     flex: 1,
-    marginHorizontal: 16,
-  },
-  counter: {
     marginLeft: 8,
   },
-  cardContainer: {
+  content: {
     flex: 1,
-    justifyContent: "center",
+    padding: 16,
   },
-  actions: {
+  modeCard: {
+    marginBottom: 16,
+    overflow: "hidden",
+    elevation: 4,
+    borderRadius: 16,
+  },
+  cardGradient: {
+    width: "100%",
+  },
+  cardContent: {
+    padding: 16,
+    backgroundColor: "rgba(0, 0, 0, 0.1)",
+  },
+  cardHeader: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    paddingVertical: 16,
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
   },
-  button: {
-    minWidth: 120,
+  titleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
-  stats: {
-    marginTop: 16,
-    textAlign: "center",
+  modeTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "white",
+  },
+  modeDescription: {
+    fontSize: 14,
+    color: "white",
+    opacity: 0.8,
+    marginLeft: 36,
   },
 });
