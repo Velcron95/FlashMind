@@ -11,6 +11,7 @@ import {
   TouchableWithoutFeedback,
   Dimensions,
   PanResponder,
+  TouchableOpacity,
 } from "react-native";
 import {
   Text,
@@ -148,50 +149,99 @@ const CardTypeSelector = ({
   selectedType: CardType;
   setSelectedType: (value: CardType) => void;
 }) => (
-  <Surface style={styles.selectorContainer}>
-    <SegmentedButtons
-      value={selectedType}
-      onValueChange={(value) => setSelectedType(value as CardType)}
-      buttons={[
-        {
-          value: "all",
-          label: "All",
-          icon: "cards",
-          style: styles.segmentButton,
-          showSelectedCheck: false,
-        },
-        {
-          value: "classic",
-          label: "Basic",
-          icon: "card-text",
-          style: styles.segmentButton,
-          showSelectedCheck: false,
-        },
-        {
-          value: "true_false",
-          label: "T/F",
-          icon: "check-circle",
-          style: styles.segmentButton,
-          showSelectedCheck: false,
-        },
-        {
-          value: "multiple_choice",
-          label: "MCQ",
-          icon: "format-list-bulleted",
-          style: styles.segmentButton,
-          showSelectedCheck: false,
-        },
+  <ScrollView
+    horizontal
+    showsHorizontalScrollIndicator={false}
+    contentContainerStyle={styles.selectorContainer}
+  >
+    <TouchableOpacity
+      onPress={() => setSelectedType("all")}
+      style={[
+        styles.filterButton,
+        selectedType === "all" && styles.filterButtonActive,
       ]}
-      theme={{
-        colors: {
-          secondaryContainer: "rgba(255, 255, 255, 0.1)",
-          onSecondaryContainer: "white",
-          outline: "transparent",
-        },
-      }}
-      style={styles.segmentedButtonGroup}
-    />
-  </Surface>
+    >
+      <LinearGradient
+        colors={
+          selectedType === "all"
+            ? ["rgba(255,255,255,0.3)", "rgba(255,255,255,0.15)"]
+            : ["rgba(255,255,255,0.15)", "rgba(255,255,255,0.05)"]
+        }
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.filterGradient}
+      >
+        <IconButton icon="cards" size={20} iconColor="white" />
+        <Text style={styles.filterText}>All Cards</Text>
+      </LinearGradient>
+    </TouchableOpacity>
+
+    <TouchableOpacity
+      onPress={() => setSelectedType("classic")}
+      style={[
+        styles.filterButton,
+        selectedType === "classic" && styles.filterButtonActive,
+      ]}
+    >
+      <LinearGradient
+        colors={
+          selectedType === "classic"
+            ? ["rgba(255,255,255,0.3)", "rgba(255,255,255,0.15)"]
+            : ["rgba(255,255,255,0.15)", "rgba(255,255,255,0.05)"]
+        }
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.filterGradient}
+      >
+        <IconButton icon="card-text" size={20} iconColor="white" />
+        <Text style={styles.filterText}>Basic</Text>
+      </LinearGradient>
+    </TouchableOpacity>
+
+    <TouchableOpacity
+      onPress={() => setSelectedType("true_false")}
+      style={[
+        styles.filterButton,
+        selectedType === "true_false" && styles.filterButtonActive,
+      ]}
+    >
+      <LinearGradient
+        colors={
+          selectedType === "true_false"
+            ? ["rgba(255,255,255,0.3)", "rgba(255,255,255,0.15)"]
+            : ["rgba(255,255,255,0.15)", "rgba(255,255,255,0.05)"]
+        }
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.filterGradient}
+      >
+        <IconButton icon="check-circle" size={20} iconColor="white" />
+        <Text style={styles.filterText}>True/False</Text>
+      </LinearGradient>
+    </TouchableOpacity>
+
+    <TouchableOpacity
+      onPress={() => setSelectedType("multiple_choice")}
+      style={[
+        styles.filterButton,
+        selectedType === "multiple_choice" && styles.filterButtonActive,
+      ]}
+    >
+      <LinearGradient
+        colors={
+          selectedType === "multiple_choice"
+            ? ["rgba(255,255,255,0.3)", "rgba(255,255,255,0.15)"]
+            : ["rgba(255,255,255,0.15)", "rgba(255,255,255,0.05)"]
+        }
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.filterGradient}
+      >
+        <IconButton icon="format-list-bulleted" size={20} iconColor="white" />
+        <Text style={styles.filterText}>Multiple Choice</Text>
+      </LinearGradient>
+    </TouchableOpacity>
+  </ScrollView>
 );
 
 export default function CategoryDetailScreen() {
@@ -380,6 +430,7 @@ export default function CategoryDetailScreen() {
           }
         }}
         label="Add Card"
+        color="white"
         customSize={56}
       />
     </LinearGradient>
@@ -449,9 +500,7 @@ const styles = StyleSheet.create({
     right: 16,
     bottom: 16,
     borderRadius: 28,
-    backgroundColor: "rgba(255, 255, 255, 0.15)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: "rgba(255,255,255,0.15)",
   },
   carouselContainer: {
     height: CARD_HEIGHT + 40,
@@ -513,18 +562,28 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   selectorContainer: {
-    marginHorizontal: 0,
-    marginVertical: 8,
-    backgroundColor: "transparent",
-    elevation: 0,
-    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    gap: 12,
   },
-  segmentButton: {
-    borderColor: "rgba(255, 255, 255, 0.1)",
-    borderWidth: 0,
-  },
-  segmentedButtonGroup: {
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
+  filterButton: {
     borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  filterButtonActive: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  filterGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  filterText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "600",
+    marginLeft: 4,
   },
 });

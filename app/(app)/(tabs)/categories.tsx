@@ -13,6 +13,7 @@ import {
   Dimensions,
   Alert,
   Animated,
+  ScrollView,
 } from "react-native";
 import {
   Text,
@@ -21,6 +22,7 @@ import {
   ActivityIndicator,
   Card,
   IconButton,
+  Chip,
 } from "react-native-paper";
 import { router } from "expo-router";
 import { useCategories, type Category } from "@/hooks/useCategories";
@@ -61,6 +63,7 @@ export default function CategoryBrowserScreen() {
   );
   const { categories, loading, error, fetchCategories, addCategory } =
     useCategoriesStore();
+  const [activeFilter, setActiveFilter] = useState("all");
 
   useEffect(() => {
     if (!user) return;
@@ -177,6 +180,57 @@ export default function CategoryBrowserScreen() {
         <Text variant="headlineMedium" style={styles.title}>
           Browse all
         </Text>
+      </View>
+
+      <View style={styles.filterContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterScroll}
+        >
+          <Chip
+            selected={activeFilter === "all"}
+            onPress={() => setActiveFilter("all")}
+            style={[
+              styles.filterChip,
+              activeFilter === "all" && styles.filterChipActive,
+            ]}
+            textStyle={[
+              styles.filterChipText,
+              activeFilter === "all" && styles.filterChipTextActive,
+            ]}
+          >
+            All
+          </Chip>
+          <Chip
+            selected={activeFilter === "recent"}
+            onPress={() => setActiveFilter("recent")}
+            style={[
+              styles.filterChip,
+              activeFilter === "recent" && styles.filterChipActive,
+            ]}
+            textStyle={[
+              styles.filterChipText,
+              activeFilter === "recent" && styles.filterChipTextActive,
+            ]}
+          >
+            Recent
+          </Chip>
+          <Chip
+            selected={activeFilter === "favorites"}
+            onPress={() => setActiveFilter("favorites")}
+            style={[
+              styles.filterChip,
+              activeFilter === "favorites" && styles.filterChipActive,
+            ]}
+            textStyle={[
+              styles.filterChipText,
+              activeFilter === "favorites" && styles.filterChipTextActive,
+            ]}
+          >
+            Favorites
+          </Chip>
+        </ScrollView>
       </View>
 
       {categories.length > 0 ? (
@@ -381,5 +435,31 @@ const styles = StyleSheet.create({
     color: "#FF6B6B",
     textAlign: "center",
     margin: 16,
+  },
+  filterContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  filterScroll: {
+    paddingRight: 16, // Extra space at the end
+    gap: 8,
+  },
+  filterChip: {
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    height: 36,
+  },
+  filterChipActive: {
+    backgroundColor: "rgba(255,255,255,0.25)",
+    borderColor: "rgba(255,255,255,0.4)",
+  },
+  filterChipText: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  filterChipTextActive: {
+    color: "white",
   },
 });
