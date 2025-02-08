@@ -9,6 +9,7 @@ import Animated, {
   runOnJS,
   WithTimingConfig,
 } from "react-native-reanimated";
+import { LinearGradient } from "expo-linear-gradient";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const CARD_WIDTH = SCREEN_WIDTH * 0.85;
@@ -18,7 +19,6 @@ interface TrueFalseSlideCardProps {
   statement: string;
   onTrue: () => void;
   onFalse: () => void;
-  onSkip: () => void;
   isAnswered: boolean;
   isCorrect: boolean | null;
   correctAnswer: string;
@@ -30,7 +30,6 @@ export const TrueFalseSlideCard: React.FC<TrueFalseSlideCardProps> = ({
   statement,
   onTrue,
   onFalse,
-  onSkip,
   isAnswered,
   isCorrect,
   correctAnswer,
@@ -41,75 +40,81 @@ export const TrueFalseSlideCard: React.FC<TrueFalseSlideCardProps> = ({
   }));
 
   return (
-    <Animated.View style={[styles.container, style, animatedStyle]}>
-      <View style={styles.card}>
-        <View style={styles.cardContent}>
-          <Text style={styles.statement}>{statement}</Text>
+    <View style={styles.wrapper}>
+      <Animated.View style={[styles.container, style, animatedStyle]}>
+        <View style={styles.card}>
+          <View style={styles.cardContent}>
+            <Text style={styles.statement}>{statement}</Text>
 
-          <View style={styles.buttons}>
-            <TouchableOpacity
-              onPress={onTrue}
-              disabled={isAnswered}
-              style={[
-                styles.button,
-                styles.trueButton,
-                isAnswered && isCorrect === true && styles.correctAnswer,
-                isAnswered && isCorrect === false && styles.wrongAnswer,
-              ]}
-            >
-              <Text style={styles.buttonText}>True</Text>
-            </TouchableOpacity>
+            <View style={styles.buttons}>
+              <TouchableOpacity
+                onPress={onFalse}
+                disabled={isAnswered}
+                style={[
+                  styles.button,
+                  isAnswered && isCorrect === false && styles.correctAnswer,
+                  isAnswered && isCorrect === true && styles.wrongAnswer,
+                ]}
+              >
+                <LinearGradient
+                  colors={["#FF6B6B", "#FF8E53"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.buttonGradient}
+                >
+                  <Text style={styles.buttonText}>False</Text>
+                </LinearGradient>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={onFalse}
-              disabled={isAnswered}
-              style={[
-                styles.button,
-                styles.falseButton,
-                isAnswered && isCorrect === false && styles.correctAnswer,
-                isAnswered && isCorrect === true && styles.wrongAnswer,
-              ]}
-            >
-              <Text style={styles.buttonText}>False</Text>
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity
-            onPress={onSkip}
-            disabled={isAnswered}
-            style={styles.skipButton}
-          >
-            <Text style={styles.skipText}>Skip</Text>
-          </TouchableOpacity>
-
-          {isAnswered && (
-            <View
-              style={[
-                styles.feedbackOverlay,
-                isCorrect ? styles.correctOverlay : styles.wrongOverlay,
-              ]}
-            >
-              <IconButton
-                icon={isCorrect ? "check-circle" : "close-circle"}
-                iconColor="white"
-                size={64}
-              />
-              <Text style={styles.feedbackText}>
-                {isCorrect ? "Correct!" : "Incorrect!"}
-              </Text>
-              <Text style={styles.correctAnswerText}>
-                Correct answer: {correctAnswer === "true" ? "True" : "False"}
-              </Text>
-              {isCorrect && (
-                <Text style={[styles.correctAnswerText, styles.wellDoneText]}>
-                  Well done! ��
-                </Text>
-              )}
+              <TouchableOpacity
+                onPress={onTrue}
+                disabled={isAnswered}
+                style={[
+                  styles.button,
+                  isAnswered && isCorrect === true && styles.correctAnswer,
+                  isAnswered && isCorrect === false && styles.wrongAnswer,
+                ]}
+              >
+                <LinearGradient
+                  colors={["#56ab2f", "#a8e063"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.buttonGradient}
+                >
+                  <Text style={styles.buttonText}>True</Text>
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
-          )}
+
+            {isAnswered && (
+              <View
+                style={[
+                  styles.feedbackOverlay,
+                  isCorrect ? styles.correctOverlay : styles.wrongOverlay,
+                ]}
+              >
+                <IconButton
+                  icon={isCorrect ? "check-circle" : "close-circle"}
+                  iconColor="white"
+                  size={64}
+                />
+                <Text style={styles.feedbackText}>
+                  {isCorrect ? "Correct!" : "Incorrect!"}
+                </Text>
+                <Text style={styles.correctAnswerText}>
+                  Correct answer: {correctAnswer === "true" ? "True" : "False"}
+                </Text>
+                {isCorrect && (
+                  <Text style={[styles.correctAnswerText, styles.wellDoneText]}>
+                    Well done!
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
         </View>
-      </View>
-    </Animated.View>
+      </Animated.View>
+    </View>
   );
 };
 
@@ -146,6 +151,11 @@ export const slideTrueFalseCard = (
 };
 
 const styles = StyleSheet.create({
+  wrapper: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   container: {
     width: CARD_WIDTH,
     height: CARD_WIDTH * 1.4,
@@ -188,41 +198,53 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 56,
     borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
+    overflow: "hidden",
     elevation: 2,
   },
-  trueButton: {
-    backgroundColor: "#4CAF50",
+  buttonGradient: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 12,
   },
-  falseButton: {
-    backgroundColor: "#f44336",
+  buttonText: {
+    fontSize: 18,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    color: "white",
+    textShadowColor: "rgba(0, 0, 0, 0.2)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   correctAnswer: {
     backgroundColor: "#4CAF50",
+    borderColor: "#45a049",
     transform: [{ scale: 0.98 }],
   },
   wrongAnswer: {
     backgroundColor: "#f44336",
-    opacity: 0.7,
+    borderColor: "#d32f2f",
     transform: [{ scale: 0.98 }],
   },
-  buttonText: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-  },
   skipButton: {
+    position: "absolute",
+    bottom: -80,
+    alignSelf: "center",
+    overflow: "hidden",
+    borderRadius: 12,
+    elevation: 2,
+  },
+  skipGradient: {
     paddingVertical: 12,
     paddingHorizontal: 24,
-    borderRadius: 8,
-    backgroundColor: "rgba(0, 0, 0, 0.05)",
   },
   skipText: {
-    color: "#666",
+    color: "white",
     fontSize: 16,
     fontWeight: "600",
+    textShadowColor: "rgba(0, 0, 0, 0.2)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   feedbackOverlay: {
     position: "absolute",
@@ -233,14 +255,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderRadius: 16,
-    backgroundColor: "rgba(0, 0, 0, 1)",
+    backgroundColor: "rgba(0, 0, 0, 0.95)",
     overflow: "hidden",
   },
   correctOverlay: {
-    backgroundColor: "#4CAF50",
+    backgroundColor: "rgba(76, 175, 80, 0.98)",
   },
   wrongOverlay: {
-    backgroundColor: "#f44336",
+    backgroundColor: "rgba(244, 67, 54, 0.98)",
   },
   feedbackText: {
     color: "white",

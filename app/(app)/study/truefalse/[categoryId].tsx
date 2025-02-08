@@ -35,7 +35,6 @@ interface TrueFalseModeProps {
   isAnimating: boolean;
   setIsAnimating: (value: boolean) => void;
   onAnswerSubmit: (isCorrect: boolean) => void;
-  onSkip: () => void;
 }
 
 const TrueFalseMode: React.FC<TrueFalseModeProps> = ({
@@ -49,7 +48,6 @@ const TrueFalseMode: React.FC<TrueFalseModeProps> = ({
   isAnimating,
   setIsAnimating,
   onAnswerSubmit,
-  onSkip,
 }) => {
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const slideX = useSharedValue(0);
@@ -104,27 +102,41 @@ const TrueFalseMode: React.FC<TrueFalseModeProps> = ({
     setTimeout(moveToNextCard, 1500);
   };
 
-  const handleSkip = () => {
-    if (!isAnswered && !isAnimating) {
-      onSkip();
-      onProgress((currentIndex + 1) / cards.length);
-      moveToNextCard();
-    }
-  };
-
   return (
     <View style={styles.cardContainer}>
-      <TrueFalseSlideCard
-        slideX={slideX}
-        statement={cards[currentIndex]?.statement}
-        onTrue={() => handleAnswer(true)}
-        onFalse={() => handleAnswer(false)}
-        onSkip={handleSkip}
-        isAnswered={isAnswered}
-        isCorrect={isCorrect}
-        correctAnswer={cards[currentIndex]?.correct_answer}
-        style={styles.cardWrapper}
-      />
+      {currentIndex < cards.length ? (
+        <TrueFalseSlideCard
+          slideX={slideX}
+          statement={cards[currentIndex]?.statement}
+          onTrue={() => handleAnswer(true)}
+          onFalse={() => handleAnswer(false)}
+          isAnswered={isAnswered}
+          isCorrect={isCorrect}
+          correctAnswer={cards[currentIndex]?.correct_answer}
+          style={styles.cardWrapper}
+        />
+      ) : (
+        <View style={styles.statsActions}>
+          <Button
+            mode="contained"
+            onPress={() => router.back()}
+            style={[styles.statsButton, styles.statsButtonLeft]}
+          >
+            Back to Deck
+          </Button>
+          <Button
+            mode="contained"
+            onPress={() => {
+              // Reset and start over
+              onNextCard(0);
+              onProgress(0);
+            }}
+            style={[styles.statsButton, styles.statsButtonRight]}
+          >
+            Study Again
+          </Button>
+        </View>
+      )}
     </View>
   );
 };
@@ -149,7 +161,6 @@ export default function TrueFalseStudyScreen() {
   const [stats, setStats] = useState({
     correct: 0,
     incorrect: 0,
-    skipped: 0,
     totalTime: 0,
   });
   const [showStats, setShowStats] = useState(false);
@@ -200,13 +211,6 @@ export default function TrueFalseStudyScreen() {
     }));
   };
 
-  const handleSkip = () => {
-    setStats((prev) => ({
-      ...prev,
-      skipped: prev.skipped + 1,
-    }));
-  };
-
   return (
     <LinearGradient colors={["#FF6B6B", "#4158D0"]} style={styles.container}>
       {!showStats ? (
@@ -241,7 +245,6 @@ export default function TrueFalseStudyScreen() {
               isAnimating={isAnimating}
               setIsAnimating={setIsAnimating}
               onAnswerSubmit={handleAnswer}
-              onSkip={handleSkip}
             />
           )}
         </>
@@ -267,10 +270,6 @@ export default function TrueFalseStudyScreen() {
               </Text>
               <Text style={styles.statLabel}>Accuracy</Text>
             </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>{stats.skipped}</Text>
-              <Text style={styles.statLabel}>Skipped</Text>
-            </View>
           </View>
 
           <View style={styles.timeContainer}>
@@ -290,7 +289,6 @@ export default function TrueFalseStudyScreen() {
                 setStats({
                   correct: 0,
                   incorrect: 0,
-                  skipped: 0,
                   totalTime: 0,
                 });
                 setShowStats(false);
@@ -344,6 +342,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    marginTop: -60,
   },
   cardWrapper: {
     width: CARD_WIDTH,
@@ -390,42 +389,33 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
   },
   trueButton: {
-    backgroundColor: "#4CAF50",
+    backgroundColor: "#56ab2f",
+    borderColor: "#56ab2f",
   },
   falseButton: {
-    backgroundColor: "#f44336",
+    backgroundColor: "#FFB75E",
+    borderColor: "#FFB75E",
+  },
+  buttonText: {
+    fontSize: 18,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    color: "white",
   },
   correctAnswer: {
     backgroundColor: "#4CAF50",
+    borderColor: "#45a049",
     transform: [{ scale: 0.98 }],
   },
   wrongAnswer: {
     backgroundColor: "#f44336",
-    opacity: 0.7,
+    borderColor: "#d32f2f",
     transform: [{ scale: 0.98 }],
-  },
-  buttonText: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-  },
-  skipButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    backgroundColor: "rgba(0, 0, 0, 0.05)",
-  },
-  skipText: {
-    color: "#666",
-    fontSize: 16,
-    fontWeight: "600",
   },
   feedback: {
     marginTop: 16,
@@ -443,6 +433,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     justifyContent: "center",
+    backgroundColor: "transparent",
   },
   statsTitle: {
     fontSize: 32,
@@ -460,31 +451,43 @@ const styles = StyleSheet.create({
   },
   statCard: {
     width: "47%",
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: "rgba(255,255,255,0.1)",
     borderRadius: 16,
     padding: 16,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
   },
   statValue: {
     fontSize: 36,
     fontWeight: "bold",
     color: "white",
     marginBottom: 8,
+    textShadowColor: "rgba(0, 0, 0, 0.2)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   statLabel: {
     fontSize: 16,
-    color: "rgba(255, 255, 255, 0.8)",
+    color: "rgba(255, 255, 255, 0.9)",
+    fontWeight: "500",
   },
   timeContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 40,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
   },
   timeText: {
     fontSize: 20,
     color: "white",
     marginLeft: 8,
+    fontWeight: "600",
   },
   statsActions: {
     flexDirection: "row",
@@ -493,10 +496,21 @@ const styles = StyleSheet.create({
   },
   statsButton: {
     flex: 1,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
   },
   cardAbsolute: {
     position: "absolute",
     top: 0,
     left: 0,
+  },
+  statsButtonLeft: {
+    marginRight: 6,
+  },
+  statsButtonRight: {
+    marginLeft: 6,
   },
 });
