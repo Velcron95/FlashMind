@@ -127,7 +127,7 @@ const TrueFalseMode: React.FC<TrueFalseModeProps> = ({
           <Button
             mode="contained"
             onPress={() => {
-              // Reset and start over
+              // Reset everything and start over
               onNextCard(0);
               onProgress(0);
             }}
@@ -250,18 +250,50 @@ export default function TrueFalseStudyScreen() {
         </>
       ) : (
         <View style={styles.statsContainer}>
-          <Text style={styles.statsTitle}>Study Complete!</Text>
+          <View style={styles.statsHeader}>
+            <Text style={styles.statsTitle}>Session Complete!</Text>
+            <Text style={styles.statsSubtitle}>Here's how you did</Text>
+          </View>
 
           <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
+            <LinearGradient
+              colors={[
+                "rgba(255, 255, 255, 0.15)",
+                "rgba(255, 255, 255, 0.05)",
+              ]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.statCard}
+            >
+              <IconButton icon="check-circle" size={28} iconColor="white" />
               <Text style={styles.statValue}>{stats.correct}</Text>
               <Text style={styles.statLabel}>Correct</Text>
-            </View>
-            <View style={styles.statCard}>
+            </LinearGradient>
+
+            <LinearGradient
+              colors={[
+                "rgba(255, 255, 255, 0.15)",
+                "rgba(255, 255, 255, 0.05)",
+              ]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.statCard}
+            >
+              <IconButton icon="close-circle" size={28} iconColor="white" />
               <Text style={styles.statValue}>{stats.incorrect}</Text>
               <Text style={styles.statLabel}>Incorrect</Text>
-            </View>
-            <View style={styles.statCard}>
+            </LinearGradient>
+
+            <LinearGradient
+              colors={[
+                "rgba(255, 255, 255, 0.15)",
+                "rgba(255, 255, 255, 0.05)",
+              ]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.statCard}
+            >
+              <IconButton icon="percent" size={28} iconColor="white" />
               <Text style={styles.statValue}>
                 {Math.round(
                   (stats.correct / (stats.correct + stats.incorrect)) * 100
@@ -269,19 +301,42 @@ export default function TrueFalseStudyScreen() {
                 %
               </Text>
               <Text style={styles.statLabel}>Accuracy</Text>
-            </View>
-          </View>
+            </LinearGradient>
 
-          <View style={styles.timeContainer}>
-            <IconButton icon="clock-outline" iconColor="white" size={24} />
-            <Text style={styles.timeText}>
-              {Math.floor(stats.totalTime / 60)}m {stats.totalTime % 60}s
-            </Text>
+            <LinearGradient
+              colors={[
+                "rgba(255, 255, 255, 0.15)",
+                "rgba(255, 255, 255, 0.05)",
+              ]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.statCard}
+            >
+              <IconButton icon="clock-outline" size={28} iconColor="white" />
+              <Text style={styles.statValue}>
+                {Math.floor(stats.totalTime / 60)}m {stats.totalTime % 60}s
+              </Text>
+              <Text style={styles.statLabel}>Study Time</Text>
+            </LinearGradient>
           </View>
 
           <View style={styles.statsActions}>
-            <Button
-              mode="contained"
+            <TouchableOpacity
+              style={[styles.statsButton, styles.statsButtonLeft]}
+              onPress={() => router.back()}
+            >
+              <LinearGradient
+                colors={["#3B82F6", "#2563EB"]}
+                style={styles.statsButtonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Text style={styles.statsButtonText}>← Back to Deck</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.statsButton, styles.statsButtonRight]}
               onPress={() => {
                 // Reset everything and start over
                 setCurrentIndex(0);
@@ -293,19 +348,19 @@ export default function TrueFalseStudyScreen() {
                 });
                 setShowStats(false);
                 startTime.current = Date.now();
+                setIsAnswered(false);
+                setIsAnimating(false);
               }}
-              style={styles.statsButton}
             >
-              Try Again
-            </Button>
-            <Button
-              mode="outlined"
-              onPress={() => router.back()}
-              style={styles.statsButton}
-              textColor="white"
-            >
-              Done
-            </Button>
+              <LinearGradient
+                colors={["#8B5CF6", "#6D28D9"]}
+                style={styles.statsButtonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Text style={styles.statsButtonText}>Study Again →</Text>
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
         </View>
       )}
@@ -431,63 +486,50 @@ const styles = StyleSheet.create({
   },
   statsContainer: {
     flex: 1,
-    padding: 20,
-    justifyContent: "center",
-    backgroundColor: "transparent",
+    padding: 24,
+    justifyContent: "space-between",
+  },
+  statsHeader: {
+    alignItems: "center",
+    marginBottom: 32,
   },
   statsTitle: {
-    fontSize: 32,
-    fontWeight: "bold",
+    fontSize: 28,
     color: "white",
-    textAlign: "center",
-    marginBottom: 40,
+    fontWeight: "bold",
+    marginBottom: 4,
+  },
+  statsSubtitle: {
+    fontSize: 16,
+    color: "white",
+    opacity: 0.7,
   },
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
-    gap: 16,
+    gap: 8,
     marginBottom: 40,
   },
   statCard: {
-    width: "47%",
-    backgroundColor: "rgba(255,255,255,0.1)",
+    flex: 1,
+    minWidth: "48%",
+    padding: 12,
     borderRadius: 16,
-    padding: 16,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
+    borderColor: "rgba(255, 255, 255, 0.1)",
   },
   statValue: {
-    fontSize: 36,
-    fontWeight: "bold",
+    fontSize: 20,
+    fontWeight: "700",
     color: "white",
-    marginBottom: 8,
-    textShadowColor: "rgba(0, 0, 0, 0.2)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    marginVertical: 2,
   },
   statLabel: {
-    fontSize: 16,
-    color: "rgba(255, 255, 255, 0.9)",
-    fontWeight: "500",
-  },
-  timeContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 40,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
-  },
-  timeText: {
-    fontSize: 20,
+    fontSize: 12,
     color: "white",
-    marginLeft: 8,
-    fontWeight: "600",
+    opacity: 0.7,
+    textAlign: "center",
   },
   statsActions: {
     flexDirection: "row",
@@ -496,21 +538,37 @@ const styles = StyleSheet.create({
   },
   statsButton: {
     flex: 1,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
-  },
-  cardAbsolute: {
-    position: "absolute",
-    top: 0,
-    left: 0,
+    height: 50,
+    borderRadius: 25,
+    overflow: "hidden",
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
   },
   statsButtonLeft: {
     marginRight: 6,
   },
   statsButtonRight: {
     marginLeft: 6,
+  },
+  statsButtonGradient: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  statsButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    textShadowColor: "rgba(0, 0, 0, 0.2)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });

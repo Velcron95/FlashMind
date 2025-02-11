@@ -26,6 +26,14 @@ const studyModes = [
     icon: "check-circle-outline",
     color: "#4CAF50",
   },
+  {
+    id: "clickanswer",
+    title: "Multiple Choice",
+    description:
+      "Select the correct answer from multiple options. Test your knowledge interactively",
+    icon: "gesture-tap",
+    color: "#9C27B0",
+  },
   // Add more study modes here
 ];
 

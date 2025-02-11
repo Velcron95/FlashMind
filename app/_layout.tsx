@@ -9,6 +9,7 @@ import { LogBox } from "react-native";
 import { authStorage } from "@/lib/utils/authStorage";
 import { supabase } from "@/lib/supabase/supabaseClient";
 import { router } from "expo-router";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -59,16 +60,18 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <AuthProvider>
-      <PaperProvider
-        theme={colorScheme === "dark" ? MD3DarkTheme : MD3LightTheme}
-      >
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(app)" options={{ headerShown: false }} />
-          <Stack.Screen name="auth" options={{ headerShown: false }} />
-          <Stack.Screen name="admin" options={{ headerShown: false }} />
-        </Stack>
-      </PaperProvider>
-    </AuthProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AuthProvider>
+        <PaperProvider
+          theme={colorScheme === "dark" ? MD3DarkTheme : MD3LightTheme}
+        >
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(app)" options={{ headerShown: false }} />
+            <Stack.Screen name="auth" options={{ headerShown: false }} />
+            <Stack.Screen name="admin" options={{ headerShown: false }} />
+          </Stack>
+        </PaperProvider>
+      </AuthProvider>
+    </GestureHandlerRootView>
   );
 }
