@@ -20,7 +20,8 @@ LogBox.ignoreLogs([
 ]);
 
 export const unstable_settings = {
-  initialRouteName: "(tabs)",
+  // Remove this or change to "dashboard"
+  // initialRouteName: "(tabs)",
 };
 
 export default function RootLayout() {
@@ -31,7 +32,6 @@ export default function RootLayout() {
       try {
         console.log("[Navigation] App starting...");
 
-        // Check if user wants to stay logged in
         const isPersisted = await authStorage.getPersist();
         if (isPersisted) {
           const {
@@ -39,7 +39,8 @@ export default function RootLayout() {
           } = await supabase.auth.getSession();
           if (session) {
             console.log("[Auth] Session found, redirecting to app");
-            router.replace("/(app)");
+            // Update this to go directly to dashboard
+            router.replace("/(app)/(tabs)/dashboard");
           } else {
             console.log("[Auth] No session found, redirecting to login");
             router.replace("/auth/sign-in");
@@ -65,9 +66,14 @@ export default function RootLayout() {
         <PaperProvider
           theme={colorScheme === "dark" ? MD3DarkTheme : MD3LightTheme}
         >
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(app)" options={{ headerShown: false }} />
-            <Stack.Screen name="auth" options={{ headerShown: false }} />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+            }}
+            initialRouteName="(app)"
+          >
+            <Stack.Screen name="(app)" />
+            <Stack.Screen name="(auth)" />
             <Stack.Screen name="admin" options={{ headerShown: false }} />
           </Stack>
         </PaperProvider>

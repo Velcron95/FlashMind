@@ -138,19 +138,62 @@ export default function ClassicStudyScreen() {
     }
   };
 
-  const handleComplete = () => {
-    const totalLearned = Object.values(cardStatuses).filter(
-      (status) => status === "learned"
-    ).length;
+  const handleComplete = async () => {
+    try {
+      const endTime = Date.now();
+      const startedAt = new Date(startTime.current).toISOString();
+      const endedAt = new Date(endTime).toISOString();
+      const duration = Math.round((endTime - startTime.current) / 1000);
 
-    setStats((prev) => ({
-      ...prev,
-      totalReviewed: cards.length,
-      learned: totalLearned,
-      learning: cards.length - totalLearned,
-      totalTime: Math.floor((Date.now() - startTime.current) / 1000),
-    }));
-    setShowStats(true);
+      // Calculate total learned cards
+      const totalLearned = Object.values(cardStatuses).filter(
+        (status) => status === "learned"
+      ).length;
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Save study session
+      const sessionData = {
+        user_id: user.id,
+        category_id: categoryId,
+        started_at: startedAt,
+        ended_at: endedAt,
+        duration: duration,
+        cards_reviewed: cards.length,
+        correct_answers: totalLearned,
+        incorrect_answers: cards.length - totalLearned,
+        study_mode: "classic",
+        accuracy: (totalLearned / cards.length) * 100,
+        created_at: startedAt,
+        updated_at: endedAt,
+      };
+
+      const { data, error } = await supabase
+        .from("study_sessions")
+        .insert(sessionData)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error saving session:", error);
+        return;
+      }
+
+      setStats((prev) => ({
+        ...prev,
+        totalReviewed: cards.length,
+        learned: totalLearned,
+        learning: cards.length - totalLearned,
+        totalTime: duration,
+      }));
+
+      setShowStats(true);
+    } catch (error) {
+      console.error("Error saving study session:", error);
+    }
   };
 
   const handleCardStatus = (status: "learning" | "learned") => {

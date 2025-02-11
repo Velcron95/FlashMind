@@ -23,6 +23,7 @@ export default function TabsLayout() {
           fontWeight: "bold",
         },
       }}
+      initialRouteName="dashboard"
     >
       <Tabs.Screen
         name="categories"
@@ -33,6 +34,7 @@ export default function TabsLayout() {
           ),
         }}
       />
+
       <Tabs.Screen
         name="study"
         options={{
@@ -42,6 +44,27 @@ export default function TabsLayout() {
           ),
         }}
       />
+
+      <Tabs.Screen
+        name="dashboard"
+        options={{
+          title: "Dashboard",
+          tabBarIcon: ({ color, size }) => (
+            <Icon name="view-dashboard" size={size} color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="stats"
+        options={{
+          title: "Stats",
+          tabBarIcon: ({ color, size }) => (
+            <Icon name="chart-line" size={size} color={color} />
+          ),
+        }}
+      />
+
       <Tabs.Screen
         name="profile"
         options={{
@@ -51,6 +74,7 @@ export default function TabsLayout() {
           ),
         }}
       />
+
       {/* Hide index from tab bar */}
       <Tabs.Screen
         name="index"

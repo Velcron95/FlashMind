@@ -195,12 +195,54 @@ export default function TrueFalseStudyScreen() {
     }
   };
 
-  const handleComplete = () => {
-    setStats((prev) => ({
-      ...prev,
-      totalTime: Math.floor((Date.now() - startTime.current) / 1000),
-    }));
-    setShowStats(true);
+  const handleComplete = async () => {
+    try {
+      const endTime = Date.now();
+      const startedAt = new Date(startTime.current).toISOString();
+      const endedAt = new Date(endTime).toISOString();
+      const duration = Math.round((endTime - startTime.current) / 1000);
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Calculate accuracy
+      const totalAnswers = stats.correct + stats.incorrect;
+      const accuracy =
+        totalAnswers > 0 ? (stats.correct / totalAnswers) * 100 : 0;
+
+      // Save study session
+      const sessionData = {
+        user_id: user.id,
+        category_id: categoryId,
+        started_at: startedAt,
+        ended_at: endedAt,
+        duration: duration,
+        cards_reviewed: stats.correct + stats.incorrect,
+        correct_answers: stats.correct,
+        incorrect_answers: stats.incorrect,
+        study_mode: "truefalse",
+        accuracy: accuracy,
+        created_at: startedAt,
+        updated_at: endedAt,
+      };
+
+      const { data, error } = await supabase
+        .from("study_sessions")
+        .insert(sessionData)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error saving session:", error);
+        return;
+      }
+
+      setShowStats(true);
+    } catch (error) {
+      console.error("Error saving study session:", error);
+    }
   };
 
   const handleAnswer = (isCorrect: boolean) => {
