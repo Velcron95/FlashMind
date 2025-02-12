@@ -227,41 +227,32 @@ function MultipleChoiceScreen() {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Calculate accuracy
-      const totalAnswers = stats.correct + stats.incorrect;
-      const accuracy =
-        totalAnswers > 0 ? (stats.correct / totalAnswers) * 100 : 0;
-
-      // Log the data we're trying to save
       const sessionData = {
         user_id: user.id,
         category_id: categoryId,
         started_at: startedAt,
         ended_at: endedAt,
         duration: duration,
-        cards_reviewed: stats.correct + stats.incorrect,
+        cards_reviewed: cards.length,
         correct_answers: stats.correct,
         incorrect_answers: stats.incorrect,
         study_mode: "multiple_choice",
-        accuracy: accuracy,
+        accuracy: (stats.correct / (stats.correct + stats.incorrect)) * 100,
         created_at: startedAt,
         updated_at: endedAt,
       };
-      console.log("Saving session data:", sessionData);
 
-      // Save study session with returning data
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("study_sessions")
-        .insert(sessionData)
-        .select()
-        .single();
+        .insert(sessionData);
 
-      if (error) {
-        console.error("Error saving session:", error);
-        return;
-      }
+      if (error) throw error;
 
-      console.log("Session saved successfully:", data);
+      setStats((prev) => ({
+        ...prev,
+        totalTime: duration,
+      }));
+
       setShowStats(true);
     } catch (error) {
       console.error("Error saving study session:", error);

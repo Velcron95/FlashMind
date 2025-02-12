@@ -207,42 +207,49 @@ export default function TrueFalseStudyScreen() {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Calculate accuracy
-      const totalAnswers = stats.correct + stats.incorrect;
-      const accuracy =
-        totalAnswers > 0 ? (stats.correct / totalAnswers) * 100 : 0;
-
-      // Save study session
       const sessionData = {
         user_id: user.id,
         category_id: categoryId,
         started_at: startedAt,
         ended_at: endedAt,
         duration: duration,
-        cards_reviewed: stats.correct + stats.incorrect,
+        cards_reviewed: cards.length,
         correct_answers: stats.correct,
         incorrect_answers: stats.incorrect,
         study_mode: "truefalse",
-        accuracy: accuracy,
+        accuracy: (stats.correct / (stats.correct + stats.incorrect)) * 100,
         created_at: startedAt,
         updated_at: endedAt,
       };
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("study_sessions")
-        .insert(sessionData)
-        .select()
-        .single();
+        .insert(sessionData);
 
-      if (error) {
-        console.error("Error saving session:", error);
-        return;
-      }
+      if (error) throw error;
+
+      setStats((prev) => ({
+        ...prev,
+        totalTime: duration,
+      }));
 
       setShowStats(true);
     } catch (error) {
       console.error("Error saving study session:", error);
     }
+  };
+
+  const handleStartAgain = () => {
+    startTime.current = Date.now();
+    setCurrentIndex(0);
+    setShowStats(false);
+    setStats({
+      correct: 0,
+      incorrect: 0,
+      totalTime: 0,
+    });
+    setIsAnswered(false);
+    setIsAnimating(false);
   };
 
   const handleAnswer = (isCorrect: boolean) => {
@@ -286,7 +293,9 @@ export default function TrueFalseStudyScreen() {
               setIsAnswered={setIsAnswered}
               isAnimating={isAnimating}
               setIsAnimating={setIsAnimating}
-              onAnswerSubmit={handleAnswer}
+              onAnswerSubmit={(isCorrect) => {
+                handleAnswer(isCorrect);
+              }}
             />
           )}
         </>
@@ -379,20 +388,7 @@ export default function TrueFalseStudyScreen() {
 
             <TouchableOpacity
               style={[styles.statsButton, styles.statsButtonRight]}
-              onPress={() => {
-                // Reset everything and start over
-                setCurrentIndex(0);
-                setProgress(0);
-                setStats({
-                  correct: 0,
-                  incorrect: 0,
-                  totalTime: 0,
-                });
-                setShowStats(false);
-                startTime.current = Date.now();
-                setIsAnswered(false);
-                setIsAnimating(false);
-              }}
+              onPress={handleStartAgain}
             >
               <LinearGradient
                 colors={["#8B5CF6", "#6D28D9"]}

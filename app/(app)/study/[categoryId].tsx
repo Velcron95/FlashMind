@@ -12,32 +12,46 @@ import Animated, {
 const studyModes = [
   {
     id: "classic",
-    title: "Basic Cards Review",
+    title: "Classic Flashcards",
     description:
-      "Review your basic flashcards. Tap to flip, swipe right for next card",
+      "Traditional flashcard study with flip cards and learning tracking",
     icon: "cards-outline",
     color: "#FF6B6B",
+    gradient: ["#FF6B6B", "#4158D0"] as [string, string],
   },
   {
     id: "truefalse",
     title: "True/False Quiz",
     description:
-      "Test your knowledge with true/false questions. Get instant feedback on your answers",
+      "Test your knowledge with true/false questions. Get instant feedback",
     icon: "check-circle-outline",
     color: "#4CAF50",
+    gradient: ["#4CAF50", "#2196F3"] as [string, string],
   },
   {
     id: "clickanswer",
     title: "Multiple Choice",
     description:
-      "Select the correct answer from multiple options. Test your knowledge interactively",
+      "Challenge yourself with multiple choice questions from your cards",
     icon: "gesture-tap",
     color: "#9C27B0",
+    gradient: ["#9C27B0", "#673AB7"] as [string, string],
   },
-  // Add more study modes here
 ];
 
-const StudyModeCard = ({ mode, onPress }: any) => {
+interface StudyModeCardProps {
+  mode: {
+    id: string;
+    title: string;
+    description: string;
+    icon: string;
+    color: string;
+    gradient: [string, string];
+  };
+  onPress: () => void;
+}
+
+const StudyModeCard: React.FC<StudyModeCardProps> = ({ mode, onPress }) => {
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -61,9 +75,10 @@ const StudyModeCard = ({ mode, onPress }: any) => {
       <Animated.View style={animatedStyle}>
         <Card style={styles.modeCard}>
           <LinearGradient
-            colors={[mode.color, "#4158D0"]}
+            colors={mode.gradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
+            style={styles.cardGradient}
           >
             <View style={styles.cardContent}>
               <View style={styles.cardHeader}>
@@ -102,14 +117,15 @@ export default function StudyModeScreen() {
         <IconButton
           icon="arrow-left"
           iconColor="white"
+          size={24}
           onPress={() => router.back()}
         />
-        <Text variant="headlineMedium" style={styles.title}>
-          Study Mode
+        <Text variant="headlineMedium" style={styles.headerTitle}>
+          Choose Study Mode
         </Text>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {studyModes.map((mode) => (
           <StudyModeCard
             key={mode.id}
@@ -130,9 +146,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     padding: 16,
-    paddingTop: 24,
+    paddingTop: 48,
   },
-  title: {
+  headerTitle: {
     color: "white",
     fontWeight: "bold",
     flex: 1,
@@ -146,6 +162,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     overflow: "hidden",
     elevation: 4,
+    borderRadius: 16,
+  },
+  cardGradient: {
     borderRadius: 16,
   },
   cardContent: {

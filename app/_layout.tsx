@@ -10,6 +10,7 @@ import { authStorage } from "@/lib/utils/authStorage";
 import { supabase } from "@/lib/supabase/supabaseClient";
 import { router } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { UserProvider } from "@/features/user/context/UserContext";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -62,22 +63,24 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AuthProvider>
-        <PaperProvider
-          theme={colorScheme === "dark" ? MD3DarkTheme : MD3LightTheme}
-        >
-          <Stack
-            screenOptions={{
-              headerShown: false,
-            }}
-            initialRouteName="(app)"
+      <UserProvider>
+        <AuthProvider>
+          <PaperProvider
+            theme={colorScheme === "dark" ? MD3DarkTheme : MD3LightTheme}
           >
-            <Stack.Screen name="(app)" />
-            <Stack.Screen name="(auth)" />
-            <Stack.Screen name="admin" options={{ headerShown: false }} />
-          </Stack>
-        </PaperProvider>
-      </AuthProvider>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+              }}
+              initialRouteName="(app)"
+            >
+              <Stack.Screen name="(app)" />
+              <Stack.Screen name="(auth)" />
+              <Stack.Screen name="admin" options={{ headerShown: false }} />
+            </Stack>
+          </PaperProvider>
+        </AuthProvider>
+      </UserProvider>
     </GestureHandlerRootView>
   );
 }

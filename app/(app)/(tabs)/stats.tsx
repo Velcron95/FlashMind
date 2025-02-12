@@ -5,6 +5,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { LineChart } from "react-native-chart-kit";
 import { supabase } from "@/lib/supabase/supabaseClient";
 import { useFocusEffect } from "@react-navigation/native";
+import { useUser } from "@/features/user/context/UserContext";
 
 interface StudyStats {
   totalCards: number;
@@ -20,6 +21,7 @@ interface RecentActivity {
   accuracy: number;
   cards_studied: number;
   created_at: string;
+  duration: number;
 }
 
 interface WeeklyData {
@@ -233,6 +235,10 @@ export default function StatsScreen() {
   const [showAchievementModal, setShowAchievementModal] = useState(false);
   const [currentAchievement, setCurrentAchievement] =
     useState<Achievement | null>(null);
+  const { userData } = useUser();
+  const [acknowledgedAchievements, setAcknowledgedAchievements] = useState<
+    string[]
+  >([]);
 
   const [stats, setStats] = useState<DetailedStats>({
     totalCards: 0,
@@ -263,6 +269,7 @@ export default function StatsScreen() {
     fetchStats();
     fetchRecentActivity();
     fetchWeeklyProgress();
+    fetchAcknowledgedAchievements();
   }, []);
 
   useFocusEffect(
@@ -280,86 +287,104 @@ export default function StatsScreen() {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch total cards
-      const { data: cards } = await supabase
+      // Get total cards from flashcards table
+      const { data: flashcards } = await supabase
         .from("flashcards")
-        .select("id")
+        .select("*")
         .eq("user_id", user.id);
 
-      console.log("Total cards:", cards?.length);
-
-      // Fetch all study sessions
-      const { data: sessions, error: sessionsError } = await supabase
+      // Get study sessions for other stats
+      const { data: sessions } = await supabase
         .from("study_sessions")
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
-      if (sessionsError) {
-        console.error("Error fetching sessions:", sessionsError);
-        return;
-      }
+      if (!sessions) return;
 
-      console.log("Study sessions:", sessions);
+      // Calculate streak
+      let currentStreak = 0;
+      let bestStreak = 0;
 
-      if (sessions) {
-        // Log each calculation
-        const totalTime = sessions.reduce(
-          (acc, session) => acc + (session.duration || 0),
-          0
-        );
-        console.log("Total time:", totalTime);
+      // Get unique dates of study sessions
+      const studyDates = [
+        ...new Set(
+          sessions.map(
+            (session) =>
+              new Date(session.created_at).toISOString().split("T")[0]
+          )
+        ),
+      ]
+        .sort()
+        .reverse();
 
-        const totalCorrect = sessions.reduce(
-          (acc, session) => acc + (session.correct_answers || 0),
-          0
-        );
-        console.log("Total correct:", totalCorrect);
+      // Calculate current streak
+      const today = new Date().toISOString().split("T")[0];
+      const yesterday = new Date(Date.now() - 86400000)
+        .toISOString()
+        .split("T")[0];
 
-        const totalAnswers = sessions.reduce(
-          (acc, session) =>
-            acc +
-            ((session.correct_answers || 0) + (session.incorrect_answers || 0)),
-          0
-        );
-        console.log("Total answers:", totalAnswers);
+      // Check if studied today or yesterday to start streak
+      if (studyDates[0] === today || studyDates[0] === yesterday) {
+        currentStreak = 1;
 
-        // Log mode stats calculation
-        const modeStats = sessions.reduce((acc, session) => {
-          if (session.study_mode) {
-            acc[session.study_mode] = (acc[session.study_mode] || 0) + 1;
+        // Check consecutive days
+        for (let i = 1; i < studyDates.length; i++) {
+          const currentDate = new Date(studyDates[i]);
+          const previousDate = new Date(studyDates[i - 1]);
+          const dayDifference = Math.floor(
+            (previousDate.getTime() - currentDate.getTime()) /
+              (1000 * 60 * 60 * 24)
+          );
+
+          if (dayDifference === 1) {
+            currentStreak++;
+          } else {
+            break;
           }
-          return acc;
-        }, {} as Record<string, number>);
-        console.log("Mode stats:", modeStats);
-
-        const cardsStudied = sessions.reduce(
-          (acc, session) => acc + (session.cards_reviewed || 0),
-          0
-        );
-        console.log("Cards studied:", cardsStudied);
-
-        const currentStreak = calculateStreak(sessions);
-        console.log("Current streak:", currentStreak);
-
-        const accuracy =
-          totalAnswers > 0 ? (totalCorrect / totalAnswers) * 100 : 0;
-
-        setStats({
-          totalCards: cards?.length || 0,
-          totalStudyTime: Math.round(totalTime / 60),
-          averageAccuracy: Math.round(accuracy),
-          streak: currentStreak,
-          totalSessions: sessions.length,
-          cardsStudied,
-          bestStreak: Math.max(currentStreak, stats.bestStreak),
-          studyModeStats: {
-            classic: modeStats.classic || 0,
-            truefalse: modeStats.truefalse || 0,
-            multiple_choice: modeStats.multiple_choice || 0,
-          },
-        });
+        }
       }
+
+      // Update best streak if current is higher
+      bestStreak = Math.max(
+        currentStreak,
+        sessions.reduce((max, session) => Math.max(max, session.streak || 0), 0)
+      );
+
+      // Calculate study stats
+      const cardsStudied = sessions.reduce(
+        (sum, session) => sum + (session.cards_reviewed || 0),
+        0
+      );
+
+      const totalTime = sessions.reduce(
+        (sum, session) => sum + (session.duration || 0),
+        0
+      );
+
+      const averageAccuracy = sessions.length
+        ? sessions.reduce((sum, session) => sum + (session.accuracy || 0), 0) /
+          sessions.length
+        : 0;
+
+      // Update stats state
+      setStats({
+        totalCards: flashcards?.length || 0,
+        totalStudyTime: Math.floor(totalTime / 60),
+        averageAccuracy: Math.round(averageAccuracy),
+        streak: currentStreak,
+        totalSessions: sessions.length,
+        cardsStudied: cardsStudied,
+        bestStreak,
+        studyModeStats: {
+          classic: sessions.filter((s) => s.study_mode === "classic").length,
+          truefalse: sessions.filter((s) => s.study_mode === "truefalse")
+            .length,
+          multiple_choice: sessions.filter(
+            (s) => s.study_mode === "multiple_choice"
+          ).length,
+        },
+      });
     } catch (error) {
       console.error("Error fetching stats:", error);
     }
@@ -384,7 +409,8 @@ export default function StatsScreen() {
           study_mode,
           accuracy,
           cards_reviewed,
-          created_at
+          created_at,
+          duration
         `
         )
         .eq("user_id", user.id)
@@ -405,6 +431,7 @@ export default function StatsScreen() {
             accuracy: Number((activity.accuracy || 0).toFixed(1)),
             cards_studied: activity.cards_reviewed || 0,
             created_at: activity.created_at,
+            duration: activity.duration || 0,
           }))
         );
       }
@@ -689,6 +716,65 @@ export default function StatsScreen() {
     </Modal>
   );
 
+  // Add helper function to format duration
+  const formatDuration = (seconds: number): string => {
+    if (seconds < 60) {
+      return `${seconds}s`;
+    }
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}m ${remainingSeconds}s`;
+  };
+
+  // Add this function to fetch acknowledged achievements
+  const fetchAcknowledgedAchievements = async () => {
+    try {
+      const { data } = await supabase
+        .from("user_achievements")
+        .select("achievement_id")
+        .eq("user_id", userData.id);
+
+      setAcknowledgedAchievements(
+        data?.map((item) => item.achievement_id) || []
+      );
+    } catch (error) {
+      console.error("Error fetching acknowledged achievements:", error);
+    }
+  };
+
+  // Modify handleAchievementComplete
+  const handleAchievementComplete = async (achievement: Achievement) => {
+    if (acknowledgedAchievements.includes(achievement.id)) {
+      return; // Skip if already acknowledged
+    }
+
+    setCurrentAchievement(achievement);
+    setShowAchievementModal(true);
+  };
+
+  // Add this function to handle modal close
+  const handleAchievementModalClose = async () => {
+    if (
+      currentAchievement &&
+      !acknowledgedAchievements.includes(currentAchievement.id)
+    ) {
+      try {
+        const { error } = await supabase.from("user_achievements").insert({
+          user_id: userData.id,
+          achievement_id: currentAchievement.id,
+        });
+
+        if (error) throw error;
+
+        // Update local state
+        setAcknowledgedAchievements((prev) => [...prev, currentAchievement.id]);
+      } catch (error) {
+        console.error("Error acknowledging achievement:", error);
+      }
+    }
+    setShowAchievementModal(false);
+  };
+
   return (
     <LinearGradient
       colors={["#FF6B6B", "#4158D0"]}
@@ -876,7 +962,8 @@ export default function StatsScreen() {
                     </Text>
                     <Text style={styles.activitySubtitle}>
                       {activity.study_mode} • {activity.accuracy}% Accuracy •{" "}
-                      {activity.cards_studied} cards
+                      {activity.cards_studied} cards •{" "}
+                      {formatDuration(activity.duration)}
                     </Text>
                   </View>
                   <Text style={styles.activityTime}>

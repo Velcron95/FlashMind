@@ -1,39 +1,13 @@
-import React, { useState, useEffect } from "react";
-import { View, StyleSheet, Pressable } from "react-native";
-import { Text, IconButton } from "react-native-paper";
+import React from "react";
+import { View, StyleSheet, Pressable, Image } from "react-native";
+import { Text, IconButton, ActivityIndicator } from "react-native-paper";
 import { LinearGradient } from "expo-linear-gradient";
-import { supabase } from "@/lib/supabase/supabaseClient";
 import { Link, useRouter } from "expo-router";
-import { PremiumManagementService } from "@/features/premium/services/premiumManagementService";
+import { useUser } from "@/features/user/context/UserContext";
 
 export default function HeaderBar() {
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { userData, isLoading } = useUser();
   const router = useRouter();
-
-  useEffect(() => {
-    fetchUser();
-  }, []);
-
-  const fetchUser = async () => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      console.log("[HeaderBar] Current user:", user?.id);
-
-      if (user) {
-        setUserEmail(user.email || null);
-        const isAdmin = await PremiumManagementService.isUserAdmin(user.id);
-        console.log("[HeaderBar] Admin check result:", isAdmin);
-        setIsAdmin(isAdmin);
-      }
-    } catch (error) {
-      console.error("[HeaderBar] Error fetching user:", error);
-      setUserEmail(null);
-      setIsAdmin(false);
-    }
-  };
 
   return (
     <LinearGradient
@@ -43,21 +17,36 @@ export default function HeaderBar() {
       style={styles.container}
     >
       <View style={styles.content}>
-        <Pressable onPress={() => router.push("/(app)")}>
+        <Pressable onPress={() => router.push("/(app)/(tabs)/dashboard")}>
           <Text style={styles.title}>FlashMind</Text>
         </Pressable>
         <View style={styles.userSection}>
-          <Text style={styles.email} numberOfLines={1}>
-            {userEmail || "Loading..."}
-          </Text>
-          <IconButton
-            icon="account-circle"
-            iconColor="white"
-            size={24}
-            onPress={() => router.push("/(app)/profile")}
-          />
+          {isLoading ? (
+            <ActivityIndicator size={24} color="white" style={styles.loader} />
+          ) : (
+            <>
+              <Text style={styles.email} numberOfLines={1}>
+                {userData.email || "Loading..."}
+              </Text>
+              {userData.avatar_url ? (
+                <Pressable onPress={() => router.push("/(app)/profile")}>
+                  <Image
+                    source={{ uri: userData.avatar_url }}
+                    style={styles.avatar}
+                  />
+                </Pressable>
+              ) : (
+                <IconButton
+                  icon="account-circle"
+                  iconColor="white"
+                  size={24}
+                  onPress={() => router.push("/(app)/profile")}
+                />
+              )}
+            </>
+          )}
         </View>
-        {isAdmin && (
+        {userData.isAdmin && (
           <Link href="/admin/premium-management" asChild>
             <IconButton
               icon="shield-crown"
@@ -74,8 +63,8 @@ export default function HeaderBar() {
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: 48,
-    paddingBottom: 12,
+    paddingTop: 32,
+    paddingBottom: 8,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.1)",
@@ -84,6 +73,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    height: 40,
   },
   title: {
     color: "white",
@@ -101,5 +91,16 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 14,
     maxWidth: 150,
+  },
+  loader: {
+    marginHorizontal: 16,
+  },
+  avatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginHorizontal: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
   },
 });

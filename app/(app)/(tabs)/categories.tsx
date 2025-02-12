@@ -24,7 +24,7 @@ import {
   IconButton,
   Chip,
 } from "react-native-paper";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useCategories, type Category } from "@/hooks/useCategories";
 import { LinearGradient } from "expo-linear-gradient";
 import { adjustColor } from "@/lib/utils/colors";
@@ -64,6 +64,7 @@ export default function CategoryBrowserScreen() {
   const { categories, loading, error, fetchCategories, addCategory } =
     useCategoriesStore();
   const [activeFilter, setActiveFilter] = useState("all");
+  const { studyMode } = useLocalSearchParams();
 
   useEffect(() => {
     if (!user) return;
@@ -145,6 +146,14 @@ export default function CategoryBrowserScreen() {
     console.log("[Categories] Premium status changed:", isPremium);
     setCanAccessAI(Boolean(isPremium));
   }, [isPremium]);
+
+  const handleCategorySelect = (categoryId: string) => {
+    // Normal category navigation
+    router.push({
+      pathname: "/(app)/category/[id]",
+      params: { id: categoryId },
+    });
+  };
 
   if (loading && !categories.length) {
     return (
@@ -258,12 +267,7 @@ export default function CategoryBrowserScreen() {
               <Card
                 style={styles.card}
                 onPress={() => {
-                  router.push({
-                    pathname: `/(app)/category/${item.id}`,
-                    params: {
-                      animation: "slide_from_right",
-                    },
-                  });
+                  handleCategorySelect(item.id);
                 }}
                 onLongPress={() => {
                   try {
