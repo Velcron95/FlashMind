@@ -2,6 +2,7 @@ import React from "react";
 import { Tabs } from "expo-router";
 import { useTheme } from "react-native-paper";
 import Icon from "@expo/vector-icons/MaterialCommunityIcons";
+import { Platform } from "react-native";
 
 export default function TabsLayout() {
   const theme = useTheme();
@@ -22,6 +23,8 @@ export default function TabsLayout() {
           fontSize: 12,
           fontWeight: "bold",
         },
+        lazy: true,
+        tabBarHideOnKeyboard: Platform.OS === "android",
       }}
       initialRouteName="dashboard"
     >
@@ -63,6 +66,12 @@ export default function TabsLayout() {
             <Icon name="chart-line" size={size} color={color} />
           ),
         }}
+        listeners={{
+          blur: () => ({
+            // This will be handled in the stats screen itself
+            // using useFocusEffect
+          }),
+        }}
       />
 
       <Tabs.Screen
@@ -75,7 +84,6 @@ export default function TabsLayout() {
         }}
       />
 
-      {/* Hide index from tab bar */}
       <Tabs.Screen
         name="index"
         options={{

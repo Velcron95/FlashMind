@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { View, StyleSheet, ScrollView, Dimensions, Modal } from "react-native";
 import { Text, Card, IconButton, Button } from "react-native-paper";
 import { LinearGradient } from "expo-linear-gradient";
@@ -78,169 +78,87 @@ interface Achievement {
   id: string;
   title: string;
   description: string;
-  progress: number;
-  goal: number;
   icon: string;
-  tier: "bronze" | "silver" | "gold";
-  completed?: boolean;
+  progress: number;
+  maxProgress: number;
+  unlocked: boolean;
 }
 
 // Expanded achievements array
 const achievements: Achievement[] = [
-  // Study Dedication
   {
-    id: "first_study",
+    id: "FIRST_STUDY",
     title: "First Steps",
     description: "Complete your first study session",
     progress: 0,
-    goal: 1,
+    maxProgress: 1,
     icon: "school",
-    tier: "bronze",
+    unlocked: false,
   },
   {
-    id: "cards_studied_bronze",
-    title: "Card Novice",
-    description: "Study 100 flashcards",
+    id: "CARD_COLLECTOR",
+    title: "Card Collector",
+    description: "Create 100 flashcards",
     progress: 0,
-    goal: 100,
+    maxProgress: 100,
     icon: "cards",
-    tier: "bronze",
+    unlocked: false,
   },
   {
-    id: "cards_studied_silver",
-    title: "Card Expert",
-    description: "Study 500 flashcards",
-    progress: 0,
-    goal: 500,
-    icon: "cards",
-    tier: "silver",
-  },
-  {
-    id: "cards_studied_gold",
-    title: "Card Master",
-    description: "Study 1000 flashcards",
-    progress: 0,
-    goal: 1000,
-    icon: "cards",
-    tier: "gold",
-  },
-
-  // Streaks
-  {
-    id: "streak_bronze",
+    id: "LEARNING_STREAK",
     title: "Consistent Learner",
-    description: "Maintain a 7-day study streak",
+    description: "Maintain a 3-day study streak",
     progress: 0,
-    goal: 7,
+    maxProgress: 3,
     icon: "fire",
-    tier: "bronze",
+    unlocked: false,
   },
   {
-    id: "streak_silver",
-    title: "Dedicated Scholar",
-    description: "Maintain a 30-day study streak",
+    id: "MASTER_LEARNER",
+    title: "Master Learner",
+    description: "Mark 50 cards as learned",
     progress: 0,
-    goal: 30,
-    icon: "fire",
-    tier: "silver",
+    maxProgress: 50,
+    icon: "star",
+    unlocked: false,
   },
   {
-    id: "streak_gold",
-    title: "Learning Legend",
-    description: "Maintain a 100-day study streak",
+    id: "FIRST_CATEGORY",
+    title: "Getting Started",
+    description: "Create your first category",
     progress: 0,
-    goal: 100,
-    icon: "fire",
-    tier: "gold",
-  },
-
-  // Accuracy
-  {
-    id: "accuracy_bronze",
-    title: "Sharp Mind",
-    description: "Achieve 80% accuracy in a session",
-    progress: 0,
-    goal: 80,
-    icon: "target",
-    tier: "bronze",
-  },
-  {
-    id: "accuracy_silver",
-    title: "Memory Master",
-    description: "Achieve 90% accuracy in a session",
-    progress: 0,
-    goal: 90,
-    icon: "target",
-    tier: "silver",
-  },
-  {
-    id: "accuracy_gold",
-    title: "Perfect Scholar",
-    description: "Achieve 100% accuracy in a session",
-    progress: 0,
-    goal: 100,
-    icon: "target",
-    tier: "gold",
-  },
-
-  // Session Completion
-  {
-    id: "sessions_bronze",
-    title: "Study Enthusiast",
-    description: "Complete 10 study sessions",
-    progress: 0,
-    goal: 10,
-    icon: "book-open-variant",
-    tier: "bronze",
-  },
-  {
-    id: "sessions_silver",
-    title: "Study Pro",
-    description: "Complete 50 study sessions",
-    progress: 0,
-    goal: 50,
-    icon: "book-open-variant",
-    tier: "silver",
-  },
-  {
-    id: "sessions_gold",
-    title: "Study Champion",
-    description: "Complete 100 study sessions",
-    progress: 0,
-    goal: 100,
-    icon: "book-open-variant",
-    tier: "gold",
+    maxProgress: 1,
+    icon: "folder",
+    unlocked: false,
   },
 ];
 
-// Add helper function to get tier color
-const getTierColor = (tier: Achievement["tier"]) => {
-  switch (tier) {
-    case "bronze":
-      return "#CD7F32";
-    case "silver":
-      return "#C0C0C0";
-    case "gold":
-      return "#FFD700";
-    default:
-      return "#4CAF50";
-  }
-};
+// Update the interface to match the actual data structure
+interface StudySessionWithCategory {
+  id: string;
+  study_mode: string;
+  accuracy: number;
+  cards_reviewed: number;
+  created_at: string;
+  duration: number;
+  category: {
+    name: string;
+  };
+}
 
 export default function StatsScreen() {
-  // Move hooks inside component
-  const [completedAchievements, setCompletedAchievements] = useState<string[]>(
-    []
-  );
-  const [showAchievementModal, setShowAchievementModal] = useState(false);
-  const [currentAchievement, setCurrentAchievement] =
-    useState<Achievement | null>(null);
-  const { userData } = useUser();
-  const [acknowledgedAchievements, setAcknowledgedAchievements] = useState<
-    string[]
-  >([]);
+  // Add mounted ref to prevent state updates after unmount
+  const isMounted = useRef(true);
 
-  const [stats, setStats] = useState<DetailedStats>({
+  const [stats, setStats] = useState<StudyStats>({
+    totalCards: 0,
+    totalStudyTime: 0,
+    averageAccuracy: 0,
+    streak: 0,
+  });
+
+  // Add studyModeStats to prevent undefined access
+  const [detailedStats, setDetailedStats] = useState<DetailedStats>({
     totalCards: 0,
     totalStudyTime: 0,
     averageAccuracy: 0,
@@ -254,34 +172,22 @@ export default function StatsScreen() {
       multiple_choice: 0,
     },
   });
+
+  // Add state for recent activity
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
-  const [weeklyData, setWeeklyData] = useState<WeeklyData>({
-    labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-    datasets: [
-      {
-        data: [0, 0, 0, 0, 0, 0, 0],
-        color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-      },
-    ],
-  });
+
+  const { userData } = useUser();
 
   useEffect(() => {
-    fetchStats();
-    fetchRecentActivity();
-    fetchWeeklyProgress();
-    fetchAcknowledgedAchievements();
+    return () => {
+      isMounted.current = false;
+    };
   }, []);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      fetchStats();
-      fetchRecentActivity();
-      fetchWeeklyProgress();
-    }, [])
-  );
 
   const fetchStats = async () => {
     try {
+      if (!userData.id || !isMounted.current) return;
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -368,71 +274,115 @@ export default function StatsScreen() {
         : 0;
 
       // Update stats state
-      setStats({
-        totalCards: flashcards?.length || 0,
-        totalStudyTime: Math.floor(totalTime / 60),
-        averageAccuracy: Math.round(averageAccuracy),
-        streak: currentStreak,
-        totalSessions: sessions.length,
-        cardsStudied: cardsStudied,
-        bestStreak,
-        studyModeStats: {
-          classic: sessions.filter((s) => s.study_mode === "classic").length,
-          truefalse: sessions.filter((s) => s.study_mode === "truefalse")
-            .length,
-          multiple_choice: sessions.filter(
-            (s) => s.study_mode === "multiple_choice"
-          ).length,
-        },
-      });
+      if (isMounted.current) {
+        setStats({
+          totalCards: flashcards?.length || 0,
+          totalStudyTime: Math.floor(totalTime / 60),
+          averageAccuracy: Math.round(averageAccuracy),
+          streak: currentStreak,
+        });
+      }
+
+      // Get study sessions for mode stats
+      const { data: modeSessions } = await supabase
+        .from("study_sessions")
+        .select("*")
+        .eq("user_id", user.id);
+
+      if (modeSessions && isMounted.current) {
+        // Calculate study mode stats
+        const modeStats = modeSessions.reduce(
+          (acc, session) => {
+            const mode = session.study_mode as keyof typeof acc;
+            if (mode) {
+              acc[mode]++;
+            }
+            return acc;
+          },
+          { classic: 0, truefalse: 0, multiple_choice: 0 }
+        );
+
+        setDetailedStats((prev) => ({
+          ...prev,
+          totalSessions: modeSessions.length,
+          studyModeStats: modeStats,
+        }));
+      }
     } catch (error) {
       console.error("Error fetching stats:", error);
     }
   };
 
-  const fetchRecentActivity = async () => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
+  // Add utility functions at the top of the file
+  const formatDuration = (seconds: number): string => {
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ${minutes % 60}m`;
+  };
 
-      const { data: activities, error } = await supabase
+  const getStudyModeIcon = (mode: string): string => {
+    switch (mode) {
+      case "classic":
+        return "cards";
+      case "truefalse":
+        return "check-circle";
+      case "multiple_choice":
+        return "format-list-bulleted";
+      default:
+        return "book";
+    }
+  };
+
+  const getStudyModeColor = (mode: string): string => {
+    switch (mode) {
+      case "classic":
+        return "#4CAF50";
+      case "truefalse":
+        return "#2196F3";
+      case "multiple_choice":
+        return "#9C27B0";
+      default:
+        return "#FFC107";
+    }
+  };
+
+  // Update the fetchRecentActivity function
+  const fetchRecentActivity = async () => {
+    if (!userData.id || !isMounted.current) return;
+
+    try {
+      const { data: sessions } = await supabase
         .from("study_sessions")
         .select(
           `
           id,
-          category_id,
-          category:category_id (
-            name
-          ),
           study_mode,
           accuracy,
           cards_reviewed,
           created_at,
-          duration
+          duration,
+          category:categories!inner(name)
         `
         )
-        .eq("user_id", user.id)
+        .eq("user_id", userData.id)
         .order("created_at", { ascending: false })
         .limit(5);
 
-      if (error) {
-        console.error("Error fetching activities:", error);
-        return;
-      }
-
-      if (activities) {
+      if (sessions && isMounted.current) {
         setRecentActivity(
-          activities.map((activity: any) => ({
-            id: activity.id,
-            category_name: activity.category?.name || "Unknown Category",
-            study_mode: formatStudyMode(activity.study_mode),
-            accuracy: Number((activity.accuracy || 0).toFixed(1)),
-            cards_studied: activity.cards_reviewed || 0,
-            created_at: activity.created_at,
-            duration: activity.duration || 0,
-          }))
+          (sessions as unknown as StudySessionWithCategory[]).map(
+            (session) => ({
+              id: session.id,
+              category_name: session.category?.name || "Unknown",
+              study_mode: session.study_mode,
+              accuracy: session.accuracy,
+              cards_studied: session.cards_reviewed,
+              created_at: session.created_at,
+              duration: session.duration,
+            })
+          )
         );
       }
     } catch (error) {
@@ -480,15 +430,7 @@ export default function StatsScreen() {
             return Math.round(totalAccuracy / daysSessions.length);
           });
 
-        setWeeklyData({
-          labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-          datasets: [
-            {
-              data: dailyStats,
-              color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-            },
-          ],
-        });
+        // ... rest of the fetchWeeklyProgress code ...
       }
     } catch (error) {
       console.error("Error fetching weekly progress:", error);
@@ -553,94 +495,6 @@ export default function StatsScreen() {
       });
   };
 
-  const formatStudyMode = (mode: string): string => {
-    switch (mode) {
-      case "classic":
-        return "Classic Review";
-      case "truefalse":
-        return "True/False";
-      case "multiple_choice":
-        return "Multiple Choice";
-      default:
-        return mode;
-    }
-  };
-
-  const getStudyModeIcon = (mode: string): string => {
-    switch (mode) {
-      case "classic":
-        return "cards";
-      case "truefalse":
-        return "check-circle";
-      case "multiple_choice":
-        return "format-list-checks";
-      default:
-        return "school";
-    }
-  };
-
-  const getStudyModeColor = (mode: string): string => {
-    switch (mode) {
-      case "classic":
-        return "#4CAF50";
-      case "truefalse":
-        return "#2196F3";
-      case "multiple_choice":
-        return "#9C27B0";
-      default:
-        return "#FFC107";
-    }
-  };
-
-  // Move updateAchievements function inside
-  const updateAchievements = (stats: DetailedStats) => {
-    const updatedAchievements = achievements.map((achievement) => {
-      let progress = 0;
-
-      switch (achievement.id) {
-        case "first_study":
-          progress = stats.totalSessions > 0 ? 1 : 0;
-          break;
-        case "cards_studied_bronze":
-        case "cards_studied_silver":
-        case "cards_studied_gold":
-          progress = stats.cardsStudied;
-          break;
-        case "streak_bronze":
-        case "streak_silver":
-        case "streak_gold":
-          progress = stats.streak;
-          break;
-        case "accuracy_bronze":
-        case "accuracy_silver":
-        case "accuracy_gold":
-          progress = stats.averageAccuracy;
-          break;
-        case "sessions_bronze":
-        case "sessions_silver":
-        case "sessions_gold":
-          progress = stats.totalSessions;
-          break;
-      }
-
-      const updatedAchievement = { ...achievement, progress };
-
-      // Check if achievement was just completed
-      if (
-        progress >= achievement.goal &&
-        !completedAchievements.includes(achievement.id)
-      ) {
-        setCompletedAchievements((prev) => [...prev, achievement.id]);
-        setCurrentAchievement(updatedAchievement);
-        setShowAchievementModal(true);
-      }
-
-      return updatedAchievement;
-    });
-
-    return updatedAchievements;
-  };
-
   const formatTimeAgo = (date: string) => {
     const now = new Date();
     const past = new Date(date);
@@ -679,101 +533,20 @@ export default function StatsScreen() {
     return diffDays === 1;
   };
 
-  // Move achievement modal component inside
-  const AchievementModal = () => (
-    <Modal
-      visible={showAchievementModal}
-      transparent
-      animationType="fade"
-      onRequestClose={() => setShowAchievementModal(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <LinearGradient
-          colors={["rgba(255, 255, 255, 0.15)", "rgba(255, 255, 255, 0.05)"]}
-          style={styles.modalContent}
-        >
-          <IconButton
-            icon={currentAchievement?.icon || "trophy"}
-            size={48}
-            iconColor={getTierColor(currentAchievement?.tier || "bronze")}
-          />
-          <Text style={styles.modalTitle}>Achievement Unlocked!</Text>
-          <Text style={styles.modalAchievementTitle}>
-            {currentAchievement?.title}
-          </Text>
-          <Text style={styles.modalDescription}>
-            {currentAchievement?.description}
-          </Text>
-          <Button
-            mode="contained"
-            onPress={() => setShowAchievementModal(false)}
-            style={styles.modalButton}
-          >
-            Awesome!
-          </Button>
-        </LinearGradient>
-      </View>
-    </Modal>
-  );
-
-  // Add helper function to format duration
-  const formatDuration = (seconds: number): string => {
-    if (seconds < 60) {
-      return `${seconds}s`;
-    }
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}m ${remainingSeconds}s`;
-  };
-
-  // Add this function to fetch acknowledged achievements
-  const fetchAcknowledgedAchievements = async () => {
-    try {
-      const { data } = await supabase
-        .from("user_achievements")
-        .select("achievement_id")
-        .eq("user_id", userData.id);
-
-      setAcknowledgedAchievements(
-        data?.map((item) => item.achievement_id) || []
-      );
-    } catch (error) {
-      console.error("Error fetching acknowledged achievements:", error);
-    }
-  };
-
-  // Modify handleAchievementComplete
-  const handleAchievementComplete = async (achievement: Achievement) => {
-    if (acknowledgedAchievements.includes(achievement.id)) {
-      return; // Skip if already acknowledged
-    }
-
-    setCurrentAchievement(achievement);
-    setShowAchievementModal(true);
-  };
-
-  // Add this function to handle modal close
-  const handleAchievementModalClose = async () => {
-    if (
-      currentAchievement &&
-      !acknowledgedAchievements.includes(currentAchievement.id)
-    ) {
-      try {
-        const { error } = await supabase.from("user_achievements").insert({
-          user_id: userData.id,
-          achievement_id: currentAchievement.id,
-        });
-
-        if (error) throw error;
-
-        // Update local state
-        setAcknowledgedAchievements((prev) => [...prev, currentAchievement.id]);
-      } catch (error) {
-        console.error("Error acknowledging achievement:", error);
+  // Use useFocusEffect instead of useEffect for tab navigation
+  useFocusEffect(
+    useCallback(() => {
+      if (isMounted.current) {
+        fetchStats();
+        fetchRecentActivity();
+        fetchWeeklyProgress();
       }
-    }
-    setShowAchievementModal(false);
-  };
+
+      return () => {
+        // Cleanup any subscriptions or pending state updates
+      };
+    }, [userData.id])
+  );
 
   return (
     <LinearGradient
@@ -830,28 +603,6 @@ export default function StatsScreen() {
             <Text style={styles.statValue}>{stats.streak}</Text>
             <Text style={styles.statLabel}>Day Streak</Text>
           </LinearGradient>
-
-          <LinearGradient
-            colors={["rgba(255, 255, 255, 0.15)", "rgba(255, 255, 255, 0.05)"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.statCard}
-          >
-            <IconButton icon="school" size={28} iconColor="white" />
-            <Text style={styles.statValue}>{stats.cardsStudied}</Text>
-            <Text style={styles.statLabel}>Cards Studied</Text>
-          </LinearGradient>
-
-          <LinearGradient
-            colors={["rgba(255, 255, 255, 0.15)", "rgba(255, 255, 255, 0.05)"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.statCard}
-          >
-            <IconButton icon="book-open-variant" size={28} iconColor="white" />
-            <Text style={styles.statValue}>{stats.totalSessions}</Text>
-            <Text style={styles.statLabel}>Study Sessions</Text>
-          </LinearGradient>
         </View>
 
         {/* Study Time Distribution */}
@@ -870,8 +621,8 @@ export default function StatsScreen() {
                     styles.distributionFill,
                     {
                       width: `${
-                        (stats.studyModeStats.classic / stats.totalSessions) *
-                        100
+                        (detailedStats.studyModeStats.classic /
+                          detailedStats.totalSessions || 0) * 100
                       }%`,
                       backgroundColor: "#4CAF50",
                     },
@@ -881,7 +632,8 @@ export default function StatsScreen() {
               <Text style={styles.distributionLabel}>Classic</Text>
               <Text style={styles.distributionValue}>
                 {Math.round(
-                  (stats.studyModeStats.classic / stats.totalSessions) * 100
+                  (detailedStats.studyModeStats.classic /
+                    detailedStats.totalSessions || 0) * 100
                 )}
                 %
               </Text>
@@ -894,8 +646,8 @@ export default function StatsScreen() {
                     styles.distributionFill,
                     {
                       width: `${
-                        (stats.studyModeStats.truefalse / stats.totalSessions) *
-                        100
+                        (detailedStats.studyModeStats.truefalse /
+                          detailedStats.totalSessions || 0) * 100
                       }%`,
                       backgroundColor: "#2196F3",
                     },
@@ -905,7 +657,8 @@ export default function StatsScreen() {
               <Text style={styles.distributionLabel}>True/False</Text>
               <Text style={styles.distributionValue}>
                 {Math.round(
-                  (stats.studyModeStats.truefalse / stats.totalSessions) * 100
+                  (detailedStats.studyModeStats.truefalse /
+                    detailedStats.totalSessions || 0) * 100
                 )}
                 %
               </Text>
@@ -918,9 +671,8 @@ export default function StatsScreen() {
                     styles.distributionFill,
                     {
                       width: `${
-                        (stats.studyModeStats.multiple_choice /
-                          stats.totalSessions) *
-                        100
+                        (detailedStats.studyModeStats.multiple_choice /
+                          detailedStats.totalSessions || 0) * 100
                       }%`,
                       backgroundColor: "#9C27B0",
                     },
@@ -930,8 +682,8 @@ export default function StatsScreen() {
               <Text style={styles.distributionLabel}>Multiple Choice</Text>
               <Text style={styles.distributionValue}>
                 {Math.round(
-                  (stats.studyModeStats.multiple_choice / stats.totalSessions) *
-                    100
+                  (detailedStats.studyModeStats.multiple_choice /
+                    detailedStats.totalSessions || 0) * 100
                 )}
                 %
               </Text>
@@ -948,7 +700,7 @@ export default function StatsScreen() {
             end={{ x: 1, y: 1 }}
             style={styles.activityCard}
           >
-            {recentActivity.map((activity, index) => (
+            {recentActivity.map((activity: RecentActivity, index: number) => (
               <React.Fragment key={activity.id}>
                 <View style={styles.activityItem}>
                   <IconButton
@@ -977,57 +729,7 @@ export default function StatsScreen() {
             ))}
           </LinearGradient>
         </View>
-
-        {/* Add study mode breakdown */}
-        <View style={styles.achievementsContainer}>
-          <Text style={styles.sectionTitle}>Achievements</Text>
-          <LinearGradient
-            colors={["rgba(255, 255, 255, 0.15)", "rgba(255, 255, 255, 0.05)"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.achievementsCard}
-          >
-            {updateAchievements(stats).map((achievement) => (
-              <View key={achievement.id} style={styles.achievementItem}>
-                <View style={styles.achievementHeader}>
-                  <IconButton
-                    icon={achievement.icon}
-                    size={24}
-                    iconColor={getTierColor(achievement.tier)}
-                  />
-                  <View style={styles.achievementTitles}>
-                    <Text style={styles.achievementTitle}>
-                      {achievement.title}
-                    </Text>
-                    <Text style={styles.achievementDescription}>
-                      {achievement.description}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.progressContainer}>
-                  <View style={styles.progressBar}>
-                    <View
-                      style={[
-                        styles.progressFill,
-                        {
-                          width: `${Math.min(
-                            (achievement.progress / achievement.goal) * 100,
-                            100
-                          )}%`,
-                        },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.progressText}>
-                    {achievement.progress}/{achievement.goal}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </LinearGradient>
-        </View>
       </ScrollView>
-      <AchievementModal />
     </LinearGradient>
   );
 }
@@ -1149,95 +851,5 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: "rgba(255, 255, 255, 0.1)",
     marginVertical: 12,
-  },
-  achievementsContainer: {
-    marginBottom: 24,
-  },
-  achievementsCard: {
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.1)",
-  },
-  achievementItem: {
-    marginBottom: 16,
-  },
-  achievementHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  achievementTitles: {
-    flex: 1,
-    marginLeft: 8,
-  },
-  achievementTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "white",
-  },
-  achievementDescription: {
-    fontSize: 12,
-    color: "rgba(255, 255, 255, 0.7)",
-  },
-  progressContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  progressBar: {
-    flex: 1,
-    height: 8,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: 4,
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    backgroundColor: "#4CAF50",
-    borderRadius: 4,
-  },
-  progressText: {
-    fontSize: 12,
-    color: "white",
-    opacity: 0.7,
-    minWidth: 45,
-    textAlign: "right",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: "rgba(30, 30, 30, 0.9)",
-    borderRadius: 16,
-    padding: 24,
-    alignItems: "center",
-    width: "100%",
-    maxWidth: 320,
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "white",
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  modalAchievementTitle: {
-    fontSize: 18,
-    color: "white",
-    marginBottom: 8,
-  },
-  modalDescription: {
-    fontSize: 14,
-    color: "rgba(255, 255, 255, 0.7)",
-    textAlign: "center",
-    marginBottom: 24,
-  },
-  modalButton: {
-    width: "100%",
   },
 });

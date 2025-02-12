@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabase/supabaseClient";
 import { router } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { UserProvider } from "@/features/user/context/UserContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -33,6 +34,12 @@ export default function RootLayout() {
       try {
         console.log("[Navigation] App starting...");
 
+        // Try to restore the session first
+        const savedSession = await authStorage.getSession();
+        if (savedSession) {
+          await supabase.auth.setSession(savedSession);
+        }
+
         const isPersisted = await authStorage.getPersist();
         if (isPersisted) {
           const {
@@ -40,7 +47,6 @@ export default function RootLayout() {
           } = await supabase.auth.getSession();
           if (session) {
             console.log("[Auth] Session found, redirecting to app");
-            // Update this to go directly to dashboard
             router.replace("/(app)/(tabs)/dashboard");
           } else {
             console.log("[Auth] No session found, redirecting to login");
@@ -62,25 +68,27 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <UserProvider>
-        <AuthProvider>
-          <PaperProvider
-            theme={colorScheme === "dark" ? MD3DarkTheme : MD3LightTheme}
-          >
-            <Stack
-              screenOptions={{
-                headerShown: false,
-              }}
-              initialRouteName="(app)"
+    <ErrorBoundary>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <UserProvider>
+          <AuthProvider>
+            <PaperProvider
+              theme={colorScheme === "dark" ? MD3DarkTheme : MD3LightTheme}
             >
-              <Stack.Screen name="(app)" />
-              <Stack.Screen name="(auth)" />
-              <Stack.Screen name="admin" options={{ headerShown: false }} />
-            </Stack>
-          </PaperProvider>
-        </AuthProvider>
-      </UserProvider>
-    </GestureHandlerRootView>
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                }}
+                initialRouteName="(app)"
+              >
+                <Stack.Screen name="(app)" />
+                <Stack.Screen name="(auth)" />
+                <Stack.Screen name="admin" options={{ headerShown: false }} />
+              </Stack>
+            </PaperProvider>
+          </AuthProvider>
+        </UserProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }

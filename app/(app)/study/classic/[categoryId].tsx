@@ -22,6 +22,8 @@ import {
 } from "@/features/cards/components/SlideCard";
 import type { ClassicCard } from "@/features/cards/types/cards";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { achievementService } from "@/lib/services/achievementService";
+import { useUser } from "@/features/user/context/UserContext";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const CARD_WIDTH = SCREEN_WIDTH * 0.85;
@@ -109,6 +111,8 @@ export default function ClassicStudyScreen() {
     easing: Easing.bezier(0.25, 0.1, 0.25, 1.0).factory(),
   };
 
+  const { userData } = useUser();
+
   useEffect(() => {
     loadCards();
   }, [categoryId]);
@@ -191,6 +195,14 @@ export default function ClassicStudyScreen() {
       }));
 
       setShowStats(true);
+
+      if (stats.learned === stats.totalReviewed) {
+        await achievementService.updateProgress(
+          userData.id!,
+          "PERFECT_SESSION",
+          1
+        );
+      }
     } catch (error) {
       console.error("Error saving study session:", error);
     }

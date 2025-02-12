@@ -96,13 +96,32 @@ export default function CategoryBrowserScreen() {
 
   const handleDelete = useCallback(
     async (category: Category) => {
-      try {
-        await db.categories.delete(category.id);
-        await fetchCategories();
-      } catch (error) {
-        console.error("[Categories] Error deleting category:", error);
-        Alert.alert("Error", "Failed to delete category");
-      }
+      Alert.alert(
+        "Delete Category",
+        "Are you sure you want to delete this category? This will also delete all flashcards and study history associated with this category.",
+        [
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                await db.categories.delete(category.id);
+                await fetchCategories();
+              } catch (error) {
+                console.error("[Categories] Error deleting category:", error);
+                Alert.alert(
+                  "Error",
+                  "Failed to delete category. Please try again."
+                );
+              }
+            },
+          },
+        ]
+      );
     },
     [fetchCategories]
   );
@@ -275,21 +294,7 @@ export default function CategoryBrowserScreen() {
                   } catch (error) {
                     console.log("Haptics not available");
                   }
-                  Alert.alert(
-                    "Delete Category",
-                    `Are you sure you want to delete "${item.name}"?`,
-                    [
-                      {
-                        text: "Cancel",
-                        style: "cancel",
-                      },
-                      {
-                        text: "Delete",
-                        style: "destructive",
-                        onPress: () => handleDelete(item),
-                      },
-                    ]
-                  );
+                  handleDelete(item);
                 }}
                 delayLongPress={300}
               >

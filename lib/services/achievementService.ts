@@ -49,7 +49,7 @@ const ACHIEVEMENTS: AchievementCheck[] = [
   },
 ];
 
-class AchievementService {
+export class AchievementService {
   private async getUserStats(userId: string): Promise<UserStats> {
     const { data: flashcards } = await supabase
       .from("flashcards")
@@ -67,7 +67,7 @@ class AchievementService {
       .eq("user_id", userId);
 
     const { data: user } = await supabase
-      .from("users")
+      .from("profiles")
       .select("streak_count")
       .eq("id", userId)
       .single();
@@ -88,11 +88,11 @@ class AchievementService {
 
   private async getExistingAchievements(userId: string): Promise<string[]> {
     const { data: achievements } = await supabase
-      .from("achievements")
-      .select("achievement_type")
-      .eq("user_id", userId);
+      .from("user_achievements")
+      .select("achievement_id")
+      .eq("profiles_id", userId);
 
-    return achievements?.map((a) => a.achievement_type) || [];
+    return achievements?.map((a) => a.achievement_id) || [];
   }
 
   async checkAchievements(userId: string): Promise<void> {
@@ -109,8 +109,8 @@ class AchievementService {
       if (newAchievements.length === 0) return;
 
       const achievementsToInsert = newAchievements.map((achievement) => ({
-        user_id: userId,
-        achievement_type: achievement.type,
+        profiles_id: userId,
+        achievement_id: achievement.type,
         achieved_at: new Date().toISOString(),
         metadata: {
           title: achievement.title,
@@ -119,7 +119,7 @@ class AchievementService {
       }));
 
       const { error } = await supabase
-        .from("achievements")
+        .from("user_achievements")
         .insert(achievementsToInsert);
 
       if (error) throw error;
@@ -133,16 +133,77 @@ class AchievementService {
   async getAchievements(userId: string) {
     try {
       const { data, error } = await supabase
-        .from("achievements")
+        .from("user_achievements")
         .select("*")
-        .eq("user_id", userId)
-        .order("achieved_at", { ascending: false });
+        .eq("profiles_id", userId)
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
       return data;
     } catch (error) {
       console.error("Error fetching achievements:", error);
       return [];
+    }
+  }
+
+  async updateProgress(
+    userId: string,
+    achievementId: string,
+    progress: number
+  ) {
+    try {
+      console.log(
+        `Updating achievement ${achievementId} for user ${userId} with progress ${progress}`
+      );
+
+      const { data: userAchievement } = await supabase
+        .from("user_achievements")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("achievement_id", achievementId)
+        .single();
+
+      const now = new Date().toISOString();
+
+      if (userAchievement) {
+        console.log("Updating existing achievement:", userAchievement);
+
+        const updateData = {
+          earned_at:
+            progress >= 100 && !userAchievement.earned_at
+              ? now
+              : userAchievement.earned_at,
+          is_seen: false,
+        };
+
+        const { error } = await supabase
+          .from("user_achievements")
+          .update(updateData)
+          .eq("id", userAchievement.id);
+
+        if (error) {
+          console.error("Error updating achievement:", error);
+        }
+      } else {
+        console.log("Creating new achievement entry");
+
+        const insertData = {
+          user_id: userId,
+          achievement_id: achievementId,
+          earned_at: progress >= 100 ? now : null,
+          is_seen: false,
+        };
+
+        const { error } = await supabase
+          .from("user_achievements")
+          .insert(insertData);
+
+        if (error) {
+          console.error("Error creating achievement:", error);
+        }
+      }
+    } catch (error) {
+      console.error("Error in updateProgress:", error);
     }
   }
 }

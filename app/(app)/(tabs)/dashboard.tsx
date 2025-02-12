@@ -1,141 +1,129 @@
-import React, { useState, useEffect } from "react";
-import { View, StyleSheet, ScrollView } from "react-native";
-import { Text, Card, Button, useTheme, IconButton } from "react-native-paper";
-import { router } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { View, StyleSheet, ScrollView, Dimensions } from "react-native";
+import { Text, Card, IconButton } from "react-native-paper";
 import { LinearGradient } from "expo-linear-gradient";
-import { useAuth } from "../../../features/auth/hooks/useAuth";
+import { router } from "expo-router";
+import { useUser } from "@/features/user/context/UserContext";
 import { supabase } from "@/lib/supabase/supabaseClient";
 
-// Add interfaces from stats.tsx
+const { width } = Dimensions.get("window");
+const CARD_MARGIN = 16;
+const CARD_WIDTH = width - CARD_MARGIN * 2;
+
 interface DashboardStats {
-  cardsStudied: number;
-  accuracy: number;
-  streak: number;
-  recentAchievements: Achievement[];
+  totalCards: number;
+  totalCategories: number;
+  cardsStudiedToday: number;
+  studyStreak: number;
 }
 
-// Add at the top with other interfaces
-interface Achievement {
-  id: string;
+interface QuickActionCardProps {
   title: string;
   description: string;
-  progress: number;
-  goal: number;
   icon: string;
-  tier: "bronze" | "silver" | "gold";
-  completed?: boolean;
+  gradient: [string, string];
+  onPress: () => void;
 }
 
-// Add before the DashboardScreen component
-const calculateStreak = (sessions: any[]) => {
-  if (!sessions.length) return 0;
-
-  // Sort sessions by date, newest first
-  const sortedSessions = sessions
-    .map((s) => s.created_at)
-    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-
-  // Check if studied today
-  const isToday = (date: string) => {
-    const today = new Date();
-    const checkDate = new Date(date);
-    return (
-      checkDate.getDate() === today.getDate() &&
-      checkDate.getMonth() === today.getMonth() &&
-      checkDate.getFullYear() === today.getFullYear()
-    );
-  };
-
-  // Check if dates are consecutive
-  const isConsecutiveDay = (date1: string, date2: string) => {
-    const d1 = new Date(date1);
-    const d2 = new Date(date2);
-    const diffTime = Math.abs(d2.getTime() - d1.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays === 1;
-  };
-
-  if (!isToday(sortedSessions[0])) return 0;
-
-  let currentStreak = 1;
-  let prevDate = new Date(sortedSessions[0]);
-
-  // Group sessions by day to avoid counting multiple sessions per day
-  const uniqueDays = [
-    ...new Set(
-      sortedSessions.map((date) => new Date(date).toISOString().split("T")[0])
-    ),
-  ];
-
-  // Count consecutive days
-  for (let i = 1; i < uniqueDays.length; i++) {
-    const currentDate = new Date(uniqueDays[i]);
-    if (isConsecutiveDay(currentDate.toISOString(), prevDate.toISOString())) {
-      currentStreak++;
-      prevDate = currentDate;
-    } else {
-      break;
-    }
-  }
-
-  return currentStreak;
-};
+interface StatCardProps {
+  value: number;
+  label: string;
+  icon: string;
+  gradient: [string, string];
+}
 
 export default function DashboardScreen() {
-  const theme = useTheme();
-  const { user } = useAuth();
+  const { userData } = useUser();
   const [stats, setStats] = useState<DashboardStats>({
-    cardsStudied: 0,
-    accuracy: 0,
-    streak: 0,
-    recentAchievements: [],
+    totalCards: 0,
+    totalCategories: 0,
+    cardsStudiedToday: 0,
+    studyStreak: 0,
   });
 
   useEffect(() => {
-    fetchDashboardStats();
-  }, []);
+    loadDashboardStats();
+  }, [userData.id]);
 
-  const fetchDashboardStats = async () => {
+  const loadDashboardStats = async () => {
+    if (!userData.id) return;
+
     try {
-      const { data: sessions } = await supabase
+      // Get total cards
+      const { count: totalCards } = await supabase
+        .from("flashcards")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", userData.id);
+
+      // Get total categories
+      const { count: totalCategories } = await supabase
+        .from("categories")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", userData.id);
+
+      // Get cards studied today
+      const today = new Date().toISOString().split("T")[0];
+      const { count: cardsStudiedToday } = await supabase
         .from("study_sessions")
-        .select("*")
-        .eq("user_id", user?.id)
-        .gte(
-          "created_at",
-          new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
-        );
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", userData.id)
+        .gte("created_at", today);
 
-      if (sessions) {
-        const totalCards = sessions.reduce(
-          (acc, session) => acc + (session.cards_reviewed || 0),
-          0
-        );
-        const totalCorrect = sessions.reduce(
-          (acc, session) => acc + (session.correct_answers || 0),
-          0
-        );
-        const totalAnswers = sessions.reduce(
-          (acc, session) =>
-            acc +
-            ((session.correct_answers || 0) + (session.incorrect_answers || 0)),
-          0
-        );
-
-        setStats({
-          cardsStudied: totalCards,
-          accuracy:
-            totalAnswers > 0
-              ? Math.round((totalCorrect / totalAnswers) * 100)
-              : 0,
-          streak: calculateStreak(sessions),
-          recentAchievements: [], // We'll populate this next
-        });
-      }
+      setStats({
+        totalCards: totalCards || 0,
+        totalCategories: totalCategories || 0,
+        cardsStudiedToday: cardsStudiedToday || 0,
+        studyStreak: 0, // You can implement streak logic later
+      });
     } catch (error) {
-      console.error("Error fetching dashboard stats:", error);
+      console.error("Error loading dashboard stats:", error);
     }
   };
+
+  const QuickActionCard: React.FC<QuickActionCardProps> = ({
+    title,
+    description,
+    icon,
+    gradient,
+    onPress,
+  }) => (
+    <Card style={styles.actionCard} onPress={onPress}>
+      <LinearGradient
+        colors={gradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.cardGradient}
+      >
+        <View style={styles.cardContent}>
+          <View style={styles.cardHeader}>
+            <IconButton icon={icon} iconColor="white" size={32} />
+            <Text style={styles.cardTitle}>{title}</Text>
+          </View>
+          <Text style={styles.cardDescription}>{description}</Text>
+        </View>
+      </LinearGradient>
+    </Card>
+  );
+
+  const StatCard: React.FC<StatCardProps> = ({
+    value,
+    label,
+    icon,
+    gradient,
+  }) => (
+    <Card style={styles.statCard}>
+      <LinearGradient
+        colors={gradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.statGradient}
+      >
+        <IconButton icon={icon} iconColor="white" size={24} />
+        <Text style={styles.statValue}>{value}</Text>
+        <Text style={styles.statLabel}>{label}</Text>
+      </LinearGradient>
+    </Card>
+  );
 
   return (
     <LinearGradient
@@ -144,93 +132,68 @@ export default function DashboardScreen() {
       end={{ x: 1, y: 1 }}
       style={styles.container}
     >
-      <ScrollView style={styles.scrollView}>
-        {/* Welcome Section */}
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={styles.welcomeText}>
-            Welcome back, {user?.email?.split("@")[0]}
+            Welcome back
+            {userData.display_name
+              ? `, ${userData.display_name}`
+              : userData.email
+              ? `, ${userData.email.split("@")[0]}`
+              : ""}
+            !
           </Text>
-          <Text style={styles.dateText}>
-            {new Date().toLocaleDateString("en-US", {
-              weekday: "long",
-              month: "long",
-              day: "numeric",
-            })}
-          </Text>
+          <Text style={styles.subtitle}>Here's your learning overview</Text>
         </View>
 
-        {/* Quick Stats */}
         <View style={styles.statsContainer}>
-          <LinearGradient
-            colors={["rgba(255, 255, 255, 0.15)", "rgba(255, 255, 255, 0.05)"]}
-            style={styles.statsCard}
-          >
-            <Text style={styles.statsTitle}>Today's Progress</Text>
-            <View style={styles.statsGrid}>
-              <View style={styles.statItem}>
-                <IconButton icon="cards" size={28} iconColor="white" />
-                <Text style={styles.statValue}>{stats.cardsStudied}</Text>
-                <Text style={styles.statLabel}>Cards Studied</Text>
-              </View>
-              <View style={styles.statItem}>
-                <IconButton icon="target" size={28} iconColor="white" />
-                <Text style={styles.statValue}>{stats.accuracy}%</Text>
-                <Text style={styles.statLabel}>Accuracy</Text>
-              </View>
-              <View style={styles.statItem}>
-                <IconButton icon="fire" size={28} iconColor="white" />
-                <Text style={styles.statValue}>{stats.streak}</Text>
-                <Text style={styles.statLabel}>Day Streak</Text>
-              </View>
-            </View>
-          </LinearGradient>
-        </View>
-
-        {/* Quick Actions */}
-        <View style={styles.actionsContainer}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.actionButtons}>
-            <LinearGradient
-              colors={["rgba(255, 255, 255, 0.2)", "rgba(255, 255, 255, 0.1)"]}
-              style={[styles.actionButton, styles.actionGradient]}
-            >
-              <Button
-                mode="contained"
-                onPress={() => router.push("/categories/create")}
-                icon="plus"
-                style={styles.transparentButton}
-                labelStyle={styles.buttonLabel}
-              >
-                New Category
-              </Button>
-            </LinearGradient>
-            <LinearGradient
-              colors={["rgba(255, 255, 255, 0.2)", "rgba(255, 255, 255, 0.1)"]}
-              style={[styles.actionButton, styles.actionGradient]}
-            >
-              <Button
-                mode="contained"
-                onPress={() => router.push("/study")}
-                icon="play"
-                style={styles.transparentButton}
-                labelStyle={styles.buttonLabel}
-              >
-                Start Studying
-              </Button>
-            </LinearGradient>
+          <View style={styles.statsRow}>
+            <StatCard
+              value={stats.totalCards}
+              label="Total Cards"
+              icon="cards"
+              gradient={["#FF6B6B", "#FF8E53"]}
+            />
+            <StatCard
+              value={stats.totalCategories}
+              label="Categories"
+              icon="folder"
+              gradient={["#4158D0", "#C850C0"]}
+            />
+          </View>
+          <View style={styles.statsRow}>
+            <StatCard
+              value={stats.cardsStudiedToday}
+              label="Studied Today"
+              icon="school"
+              gradient={["#00B4DB", "#0083B0"]}
+            />
+            <StatCard
+              value={stats.studyStreak}
+              label="Day Streak"
+              icon="fire"
+              gradient={["#FF416C", "#FF4B2B"]}
+            />
           </View>
         </View>
 
-        {/* Recent Achievements */}
-        <View style={styles.achievementsContainer}>
-          <Text style={styles.sectionTitle}>Recent Achievements</Text>
-          <LinearGradient
-            colors={["rgba(255, 255, 255, 0.15)", "rgba(255, 255, 255, 0.05)"]}
-            style={styles.achievementsCard}
-          >
-            {/* We'll add achievements here */}
-          </LinearGradient>
-        </View>
+        <Text style={styles.sectionTitle}>Quick Actions</Text>
+
+        <QuickActionCard
+          title="Study Now"
+          description="Choose a study mode and start learning"
+          icon="book-open-variant"
+          gradient={["#4CAF50", "#2196F3"]}
+          onPress={() => router.push("/(app)/(tabs)/study")}
+        />
+
+        <QuickActionCard
+          title="Create Cards"
+          description="Add new flashcards to your collection"
+          icon="plus-circle"
+          gradient={["#9C27B0", "#673AB7"]}
+          onPress={() => router.push("/(app)/(tabs)/categories")}
+        />
       </ScrollView>
     </LinearGradient>
   );
@@ -240,89 +203,90 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollView: {
+  content: {
     flex: 1,
-    padding: 16,
   },
   header: {
-    marginTop: 40,
-    marginBottom: 24,
+    padding: 24,
+    paddingTop: 48,
   },
   welcomeText: {
-    fontSize: 24,
+    fontSize: 32,
     fontWeight: "bold",
     color: "white",
+    marginBottom: 8,
   },
-  dateText: {
-    fontSize: 16,
-    color: "rgba(255, 255, 255, 0.8)",
+  subtitle: {
+    fontSize: 18,
+    color: "white",
+    opacity: 0.8,
   },
   statsContainer: {
-    marginBottom: 24,
+    padding: 16,
   },
-  statsCard: {
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-  },
-  statsGrid: {
+  statsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 16,
-  },
-  statItem: {
-    alignItems: "center",
-  },
-  actionsContainer: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "white",
     marginBottom: 16,
   },
-  actionButtons: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  actionButton: {
-    flex: 1,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-  },
-  actionGradient: {
-    borderRadius: 12,
+  statCard: {
+    width: (width - 48) / 2,
+    borderRadius: 16,
     overflow: "hidden",
+    elevation: 4,
   },
-  transparentButton: {
-    backgroundColor: "transparent",
-    elevation: 0,
-  },
-  buttonLabel: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  achievementsContainer: {
-    marginBottom: 24,
-  },
-  achievementsCard: {
+  statGradient: {
     padding: 16,
-    borderRadius: 12,
-  },
-  statsTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "white",
-    marginBottom: 16,
-    marginLeft: 8,
+    alignItems: "center",
   },
   statValue: {
     fontSize: 24,
     fontWeight: "bold",
     color: "white",
-    marginVertical: 4,
+    marginVertical: 8,
   },
   statLabel: {
     fontSize: 14,
-    color: "rgba(255, 255, 255, 0.8)",
+    color: "white",
+    opacity: 0.8,
+  },
+  sectionTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "white",
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 12,
+  },
+  actionCard: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 16,
+    overflow: "hidden",
+    elevation: 4,
+  },
+  cardGradient: {
+    borderRadius: 16,
+  },
+  cardContent: {
+    padding: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.1)",
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  cardTitle: {
+    fontSize: 24,
+    fontWeight: "600",
+    color: "white",
+    marginLeft: 8,
+  },
+  cardDescription: {
+    fontSize: 16,
+    color: "white",
+    opacity: 0.9,
+    marginLeft: 40,
   },
 });

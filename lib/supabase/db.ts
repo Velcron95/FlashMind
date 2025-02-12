@@ -138,19 +138,46 @@ export const db = {
       return newCategory;
     },
 
-    async delete(id: string) {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+    async delete(categoryId: string) {
+      try {
+        // First delete all flashcards in this category
+        const { error: flashcardsError } = await supabase
+          .from("flashcards")
+          .delete()
+          .eq("category_id", categoryId);
 
-      const { error: deleteError } = await supabase
-        .from("categories")
-        .delete()
-        .eq("id", id)
-        .eq("user_id", user.id);
+        if (flashcardsError) {
+          console.error("Error deleting flashcards:", flashcardsError);
+          throw flashcardsError;
+        }
 
-      if (deleteError) throw deleteError;
+        // Then delete the study sessions for this category
+        const { error: sessionsError } = await supabase
+          .from("study_sessions")
+          .delete()
+          .eq("category_id", categoryId);
+
+        if (sessionsError) {
+          console.error("Error deleting study sessions:", sessionsError);
+          throw sessionsError;
+        }
+
+        // Finally delete the category itself
+        const { error: categoryError } = await supabase
+          .from("categories")
+          .delete()
+          .eq("id", categoryId);
+
+        if (categoryError) {
+          console.error("Error deleting category:", categoryError);
+          throw categoryError;
+        }
+
+        return true;
+      } catch (error) {
+        console.error("Error in category deletion:", error);
+        throw error;
+      }
     },
 
     async update(

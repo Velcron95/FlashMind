@@ -1,32 +1,50 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 
-const AUTH_PERSIST_KEY = "auth-persist";
-const AUTH_SESSION_KEY = "supabase.auth.token";
+const PERSIST_KEY = "auth-persist";
+const SESSION_KEY = "supabase-session";
 
 export const authStorage = {
-  getPersist: async () => {
+  setPersist: async (value: boolean) => {
     try {
-      const value = await AsyncStorage.getItem(AUTH_PERSIST_KEY);
-      return value === "true";
-    } catch (e) {
+      await SecureStore.setItemAsync(PERSIST_KEY, JSON.stringify(value));
+    } catch (error) {
+      console.error("Error setting persist:", error);
+    }
+  },
+
+  getPersist: async (): Promise<boolean> => {
+    try {
+      const value = await SecureStore.getItemAsync(PERSIST_KEY);
+      return value ? JSON.parse(value) : false;
+    } catch (error) {
+      console.error("Error getting persist:", error);
       return false;
     }
   },
 
-  setPersist: async (value: boolean) => {
+  setSession: async (session: any) => {
     try {
-      await AsyncStorage.setItem(AUTH_PERSIST_KEY, value.toString());
-    } catch (e) {
-      console.error("Error setting persist:", e);
+      await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(session));
+    } catch (error) {
+      console.error("Error setting session:", error);
     }
   },
 
-  clear: async () => {
+  getSession: async () => {
     try {
-      // Only clear auth-related keys
-      await AsyncStorage.multiRemove([AUTH_PERSIST_KEY, AUTH_SESSION_KEY]);
-    } catch (e) {
-      console.error("Error clearing auth storage:", e);
+      const session = await SecureStore.getItemAsync(SESSION_KEY);
+      return session ? JSON.parse(session) : null;
+    } catch (error) {
+      console.error("Error getting session:", error);
+      return null;
+    }
+  },
+
+  clearSession: async () => {
+    try {
+      await SecureStore.deleteItemAsync(SESSION_KEY);
+    } catch (error) {
+      console.error("Error clearing session:", error);
     }
   },
 };

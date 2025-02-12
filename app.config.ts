@@ -1,49 +1,46 @@
-import { ExpoConfig } from "expo/config";
+import { ExpoConfig, ConfigContext } from "expo/config";
 
-const config: ExpoConfig = {
+export default ({ config }: ConfigContext): ExpoConfig => ({
+  ...config,
   name: "FlashMind",
   slug: "flashmind",
+  scheme: "flashmind",
   version: "1.0.0",
   orientation: "portrait",
-  icon: "./assets/icon.png",
-  userInterfaceStyle: "light",
-  scheme: "flashmind",
+  icon: "./assets/FlashMindLogo.jpg",
+  userInterfaceStyle: "automatic",
   splash: {
-    image: "./assets/splash.png",
+    image: "./assets/FlashMindLogo.jpg",
     resizeMode: "contain",
-    backgroundColor: "#ffffff",
+    backgroundColor: "#1A1A1A",
   },
-  experiments: {
-    tsconfigPaths: true,
+  assetBundlePatterns: ["**/*"],
+  ios: {
+    supportsTablet: true,
+    bundleIdentifier: "com.flashmind.app",
+  },
+  android: {
+    adaptiveIcon: {
+      foregroundImage: "./assets/FlashMindLogo.jpg",
+      backgroundColor: "#1A1A1A",
+    },
+    package: "com.flashmind.app",
   },
   plugins: [
-    "expo-router",
+    "expo-secure-store",
     [
       "expo-build-properties",
       {
-        newArchEnabled: true,
+        android: {
+          usesCleartextTraffic: true,
+        },
       },
     ],
   ],
   extra: {
-    supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
-    supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
-    deepseekApiKey: process.env.EXPO_PUBLIC_DEEPSEEK_API_KEY,
     eas: {
-      projectId: "your-project-id",
+      projectId: "aa552198-3989-4ec5-92e5-8413b23a994e",
     },
   },
-  ios: {
-    supportsTablet: true,
-    bundleIdentifier: "com.yourcompany.flashmind",
-  },
-  android: {
-    package: "com.yourcompany.flashmind",
-    adaptiveIcon: {
-      foregroundImage: "./assets/adaptive-icon.png",
-      backgroundColor: "#ffffff",
-    },
-  },
-};
-
-export default config;
+  owner: "velcron",
+});

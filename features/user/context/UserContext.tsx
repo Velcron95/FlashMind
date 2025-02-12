@@ -7,6 +7,7 @@ interface UserData {
   email: string | null;
   avatar_url: string | null;
   isAdmin: boolean;
+  display_name: string | null;
 }
 
 interface UserContextType {
@@ -16,7 +17,13 @@ interface UserContextType {
 }
 
 const UserContext = createContext<UserContextType>({
-  userData: { id: null, email: null, avatar_url: null, isAdmin: false },
+  userData: {
+    id: null,
+    email: null,
+    avatar_url: null,
+    isAdmin: false,
+    display_name: null,
+  },
   isLoading: true,
   refreshUserData: async () => {},
 });
@@ -27,6 +34,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     email: null,
     avatar_url: null,
     isAdmin: false,
+    display_name: null,
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -34,23 +42,55 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       const {
         data: { user },
+        error: authError,
       } = await supabase.auth.getUser();
 
-      if (user) {
-        const [profile, isAdmin] = await Promise.all([
-          supabase.from("profiles").select("*").eq("id", user.id).single(),
-          PremiumManagementService.isUserAdmin(user.id),
-        ]);
+      if (authError) {
+        console.error("Auth error:", authError);
+        setIsLoading(false);
+        return;
+      }
 
-        setUserData({
-          id: user.id,
-          email: user.email || null,
-          avatar_url: profile.data?.avatar_url || null,
-          isAdmin,
-        });
+      if (user) {
+        try {
+          const [profileResponse, isAdmin] = await Promise.all([
+            supabase.from("profiles").select("*").eq("id", user.id).single(),
+            PremiumManagementService.isUserAdmin(user.id),
+          ]);
+
+          if (profileResponse.error) {
+            console.error("Profile fetch error:", profileResponse.error);
+            // Set basic user data even if profile fetch fails
+            setUserData({
+              id: user.id,
+              email: user.email || null,
+              avatar_url: null,
+              display_name: null,
+              isAdmin: false,
+            });
+          } else {
+            setUserData({
+              id: user.id,
+              email: user.email || null,
+              avatar_url: profileResponse.data?.avatar_url || null,
+              display_name: profileResponse.data?.display_name || null,
+              isAdmin,
+            });
+          }
+        } catch (error) {
+          console.error("Error in profile/admin check:", error);
+          // Set basic user data on error
+          setUserData({
+            id: user.id,
+            email: user.email || null,
+            avatar_url: null,
+            display_name: null,
+            isAdmin: false,
+          });
+        }
       }
     } catch (error) {
-      console.error("Error fetching user data:", error);
+      console.error("Error in fetchUserData:", error);
     } finally {
       setIsLoading(false);
     }
