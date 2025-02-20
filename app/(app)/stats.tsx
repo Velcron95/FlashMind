@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { View, StyleSheet, ScrollView } from "react-native";
 import {
   Text,
@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from "react-native-paper";
 import { supabase } from "../../lib/supabase/supabaseClient";
+import { useFocusEffect } from "@react-navigation/native";
 
 interface CategoryStats {
   id: string;
@@ -41,9 +42,14 @@ export default function StatsScreen() {
     streak: 0,
   });
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchStats();
+      return () => {
+        // Optional cleanup
+      };
+    }, [])
+  );
 
   const fetchStats = async () => {
     try {
@@ -117,20 +123,20 @@ export default function StatsScreen() {
           0
         ) || 0;
 
-      // Fetch streak
-      const { data: streakData, error: streakError } = await supabase
-        .from("users")
+      // Fetch streak from profiles table instead of users
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
         .select("streak_count")
         .eq("id", user.id)
         .single();
 
-      if (streakError) throw streakError;
+      if (profileError) throw profileError;
 
       setTotalStats({
         totalCards,
         learnedCards,
         studyTime: Math.floor(studyTime / (1000 * 60 * 60)), // Convert to hours
-        streak: streakData?.streak_count || 0,
+        streak: profile?.streak_count || 0,
       });
     } catch (err) {
       setError(

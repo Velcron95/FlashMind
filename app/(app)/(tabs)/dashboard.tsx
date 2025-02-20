@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { View, StyleSheet, ScrollView, Dimensions } from "react-native";
-import { Text, Card, IconButton } from "react-native-paper";
+import { Text, Card, IconButton, ActivityIndicator } from "react-native-paper";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useUser } from "@/features/user/context/UserContext";
+import { useUser } from "@/hooks/useUser";
 import { supabase } from "@/lib/supabase/supabaseClient";
+import { useFocusEffect } from "@react-navigation/native";
+import { areDatesConsecutive, isToday } from "@/utils/dateUtils";
 
 const { width } = Dimensions.get("window");
 const CARD_MARGIN = 16;
@@ -33,7 +35,7 @@ interface StatCardProps {
 }
 
 export default function DashboardScreen() {
-  const { userData } = useUser();
+  const { user, loading } = useUser();
   const [stats, setStats] = useState<DashboardStats>({
     totalCards: 0,
     totalCategories: 0,
@@ -41,39 +43,101 @@ export default function DashboardScreen() {
     studyStreak: 0,
   });
 
-  useEffect(() => {
-    loadDashboardStats();
-  }, [userData.id]);
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.id) {
+        loadDashboardStats();
+      }
+    }, [user?.id])
+  );
 
   const loadDashboardStats = async () => {
-    if (!userData.id) return;
+    if (!user?.id) return;
 
     try {
       // Get total cards
       const { count: totalCards } = await supabase
         .from("flashcards")
         .select("*", { count: "exact", head: true })
-        .eq("user_id", userData.id);
+        .eq("user_id", user.id);
 
       // Get total categories
       const { count: totalCategories } = await supabase
         .from("categories")
         .select("*", { count: "exact", head: true })
-        .eq("user_id", userData.id);
+        .eq("user_id", user.id);
 
-      // Get cards studied today
+      // Get cards studied today - Update this query to use cards_reviewed
       const today = new Date().toISOString().split("T")[0];
-      const { count: cardsStudiedToday } = await supabase
+      const { data: todaySessions } = await supabase
         .from("study_sessions")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", userData.id)
+        .select("cards_reviewed")
+        .eq("user_id", user.id)
         .gte("created_at", today);
+
+      // Calculate total cards studied today
+      const cardsStudiedToday =
+        todaySessions?.reduce(
+          (sum, session) => sum + (session.cards_reviewed || 0),
+          0
+        ) || 0;
+
+      // Get the user's profile and last study session
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("streak_count, last_study_date")
+        .eq("id", user.id)
+        .single();
+
+      const { data: lastSession } = await supabase
+        .from("study_sessions")
+        .select("created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      let currentStreak = profile?.streak_count || 0;
+
+      if (lastSession && profile?.last_study_date) {
+        const lastStudyDate = new Date(profile.last_study_date);
+        const todayDate = new Date();
+
+        // If last study was today, keep current streak
+        if (isToday(lastStudyDate)) {
+          currentStreak = profile.streak_count;
+        }
+        // If last study was yesterday, increment streak
+        else if (areDatesConsecutive(todayDate, lastStudyDate)) {
+          currentStreak = (profile.streak_count || 0) + 1;
+          // Update the streak in the database
+          await supabase
+            .from("profiles")
+            .update({
+              streak_count: currentStreak,
+              last_study_date: todayDate.toISOString(),
+              updated_at: todayDate.toISOString(),
+            })
+            .eq("id", user.id);
+        }
+        // If more than a day has passed, reset streak
+        else {
+          currentStreak = 0;
+          await supabase
+            .from("profiles")
+            .update({
+              streak_count: 0,
+              updated_at: todayDate.toISOString(),
+            })
+            .eq("id", user.id);
+        }
+      }
 
       setStats({
         totalCards: totalCards || 0,
         totalCategories: totalCategories || 0,
-        cardsStudiedToday: cardsStudiedToday || 0,
-        studyStreak: 0, // You can implement streak logic later
+        cardsStudiedToday,
+        studyStreak: currentStreak,
       });
     } catch (error) {
       console.error("Error loading dashboard stats:", error);
@@ -125,6 +189,22 @@ export default function DashboardScreen() {
     </Card>
   );
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="white" />
+      </View>
+    );
+  }
+
+  if (!user) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Please sign in to continue</Text>
+      </View>
+    );
+  }
+
   return (
     <LinearGradient
       colors={["#FF6B6B", "#4158D0"]}
@@ -136,12 +216,7 @@ export default function DashboardScreen() {
         <View style={styles.header}>
           <Text style={styles.welcomeText}>
             Welcome back
-            {userData.display_name
-              ? `, ${userData.display_name}`
-              : userData.email
-              ? `, ${userData.email.split("@")[0]}`
-              : ""}
-            !
+            {user.email ? `, ${user.email.split("@")[0]}` : ""}!
           </Text>
           <Text style={styles.subtitle}>Here's your learning overview</Text>
         </View>
@@ -288,5 +363,21 @@ const styles = StyleSheet.create({
     color: "white",
     opacity: 0.9,
     marginLeft: 40,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  errorText: {
+    color: "white",
+    fontSize: 16,
+    textAlign: "center",
   },
 });

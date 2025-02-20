@@ -12,8 +12,7 @@ import {
   useTheme,
 } from "react-native-paper";
 import { router } from "expo-router";
-import { supabase } from "../../lib/supabase/supabaseClient";
-import { usePremium } from "../../hooks/usePremium";
+import { supabase } from "@/lib/supabase/supabaseClient";
 import * as Linking from "expo-linking";
 
 interface Settings {
@@ -26,7 +25,6 @@ interface Settings {
 
 export default function SettingsScreen() {
   const theme = useTheme();
-  const { isPremium } = usePremium();
   const [settings, setSettings] = useState<Settings>({
     darkMode: false,
     notifications: true,
@@ -152,13 +150,11 @@ export default function SettingsScreen() {
           <List.Subheader>Study</List.Subheader>
           <List.Item
             title="Text-to-Speech"
-            description={!isPremium ? "Premium feature" : undefined}
             left={(props) => <List.Icon {...props} icon="text-to-speech" />}
             right={() => (
               <Switch
-                value={settings.textToSpeech && isPremium}
+                value={settings.textToSpeech}
                 onValueChange={() => handleToggleSetting("textToSpeech")}
-                disabled={!isPremium}
               />
             )}
           />

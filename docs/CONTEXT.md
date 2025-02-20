@@ -1,15 +1,14 @@
-# FlashMind - AI-Powered Flashcard App
+# FlashMind - Smart Flashcard App
 
 ## Overview
 
-FlashMind is an AI-powered flashcard application designed to help users create and study flashcards with ease. The app provides an intuitive, clean interface with AI-assisted features powered by Deepseek AI. It follows a freemium model where basic features are free and advanced AI capabilities are available through premium subscriptions.
+FlashMind is a flashcard application designed to help users create and study flashcards with ease. The app provides an intuitive, clean interface with a token-based system for purchasing pre-made categories.
 
 ## Tech Stack:
 
 Frontend: React Native with TypeScript, Expo, and Expo Router
 Backend/Database: Supabase
 UI Framework: React Native Paper
-AI Processing: DeepSeek
 
 ## Core Features
 
@@ -17,6 +16,7 @@ AI Processing: DeepSeek
 
 - Email-based signup and login via Supabase
 - Secure user authentication and session management
+- 100 tokens awarded upon signup (enough to purchase one category)
 
 ### Main Dashboard
 
@@ -47,45 +47,26 @@ AI Processing: DeepSeek
      - Interactive and engaging format
 
 - Category organization and tagging
-- AI-assisted definition improvements (Premium)
 - Search functionality across all categories
 - Advanced filtering options (difficulty, last studied, etc.)
 
-### Study Features
-
-- Quiz-style flashcard review
-- "Learned" and "Difficult" card marking
-- AI-powered spaced repetition (Premium)
-- Personalized study plans (Premium)
-- Text-to-speech for terms and definitions
-- Customizable text size for accessibility
-
-### AI Capabilities (Premium)
-
-- Automated category generation and suggestions
-- Smart study interval recommendations
-- Performance analytics and insights
-- Definition quality improvements
-- Personalized learning paths
-- Continuous adaptation to user performance
-- AI-powered feedback on flashcard clarity
-
-### Social & Collaboration
-
-- Flashcard sharing between users
-- Collaborative study groups
-- Community-driven flashcard sets
-- User rankings and leaderboards
-- Shared category access
-
 ### User Experience
 
-- Interactive onboarding tutorial
-- Customizable themes (light/dark mode)
-- Achievement badges and rewards
 - Daily/weekly study streaks
-- Cross-device synchronization
-- Seamless mobile/desktop experience
+
+### Token System
+
+- Initial 100 tokens upon account creation
+  - Allows new users to immediately purchase one category (100 tokens) or
+  - Generate up to 100 AI flashcards (1 token each)
+- Token usage:
+  - AI flashcard generation (1 token per card)
+  - Purchase pre-made categories (100 tokens per category)
+- Token packages:
+  - 50 tokens → $2.99
+  - 100 tokens → $5.49
+  - 250 tokens → $11.49
+  - 500 tokens → $21.99
 
 ## Monetization
 
@@ -95,17 +76,6 @@ AI Processing: DeepSeek
 - Manual category organization
 - Limited features with ads
 - Basic search and filter functionality
-
-### Premium Tier
-
-- Full AI-powered feature set
-- Maximum 100 flashcards per category
-- Maximum 200 API tokens per month
-- Unlimited flashcards and categories
-- Users can put in their notes to make ai flashcards
-- Ad-free experience
-
-- Monthly or yearly subscription options
 
 ## Database Schema
 
@@ -117,7 +87,6 @@ AI Processing: DeepSeek
 - email: string (unique)
 - created_at: timestamp
 - last_login: timestamp
-- is_premium: boolean
 - streak_count: integer
 - settings: jsonb
 
@@ -166,6 +135,58 @@ AI Processing: DeepSeek
 - achievement_type: string
 - achieved_at: timestamp
 - metadata: jsonb
+
+#### profiles
+
+- id: uuid (PK)
+- email: string
+- streak_count: integer
+- last_study_date: timestamp
+- created_at: timestamp
+- updated_at: timestamp
+- token_balance: integer
+
+#### user_tokens
+
+- id: uuid (PK)
+- user_id: uuid (FK -> users.id)
+- token_balance: integer
+- last_updated: timestamp
+
+#### token_transactions
+
+- id: uuid (PK)
+- user_id: uuid (FK -> users.id)
+- amount: integer
+- transaction_type: enum ('purchase', 'spend', 'reward')
+- description: text
+- created_at: timestamp
+
+#### store_categories
+
+- id: uuid (PK)
+- name: string
+- description: text
+- preview_cards: jsonb[] // Sample cards of each type
+- cards: jsonb {
+  classic: Array<{term: string, definition: string}>,
+  true_false: Array<{statement: string, correct_answer: string}>,
+  multiple_choice: Array<{question: string, options: string[], correct_answer: string}>
+  }
+- token_cost: integer
+- category_type: string
+- difficulty_level: string
+- created_at: timestamp
+- updated_at: timestamp
+
+#### purchased_categories
+
+- id: uuid (PK)
+- user_id: uuid (FK -> users.id)
+- store_category_id: uuid (FK -> store_categories.id)
+- purchase_date: timestamp
+- transaction_id: uuid (FK -> token_transactions.id)
+- is_active: boolean
 
 ## Project Structure
 
@@ -268,98 +289,4 @@ FlashMind/
   - `/cards`
     - `/components`
       - `ClassicCard.tsx` - Traditional flashcard component
-      - `TrueFalseCard.tsx` - True/False statement cards
-      - `MultipleChoiceCard.tsx` - Multiple choice drag-drop cards
-      - `CardFactory.tsx` - Factory pattern for card creation
-    - `/hooks`
-      - `useCardInteraction.ts` - Shared card interaction logic
-      - `useDragDrop.ts` - Drag and drop functionality
-    - `/types`
-      - `cards.ts` - Card type definitions
-    - `/utils`
-      - `cardValidation.ts` - Card validation utilities
-      - `dragDropHelpers.ts` - Drag and drop helper functions
-
-## Libraries and Utils
-
-- `/lib` - Shared libraries and utilities
-  - `/supabase` - Supabase client and utilities
-  - `/utils` - Helper functions
-
-## Components
-
-- `/components` - Shared UI components
-  - `HeaderBar.tsx`
-  - Other reusable components...
-
-## Documentation
-
-- `/docs` - Project documentation
-  - `CONTEXT.md` - Project structure and context
-  - Other documentation files...
-
-## Learning Flow
-
-### Study Modes
-
-#### 1. Review Mode (Default)
-
-- Classic flashcard experience with intuitive gestures
-- Tap to reveal answer
-- Swipe right for correct, left for incorrect
-- Progress tracking and performance metrics
-- Available to all users
-
-#### 5. Random Mode
-
-- Cross-category learning
-
-### Learning Process Flow
-
-1. **Category Selection**
-
-   - Browse personal categories
-
-   - View progress indicators
-
-2. **Mode Selection**
-
-   - Choose preferred study mode
-   - Set session duration
-   - Configure mode-specific settings
-   - View mode recommendations (Premium)
-
-3. **Study Session**
-
-   - Active recall practice
-   - Performance tracking
-   - Real-time feedback
-   - Progress indicators
-   - Streak monitoring
-
-4. **Session Summary**
-
-   - Detailed performance metrics
-   - ✅ Correct/incorrect ratio
-   - ⏱️ Time per card analysis
-   - 📊 Progress visualization
-   - 🎯 Achievement updates
-
-### Enhanced Features
-
-#### Accessibility
-
-- Customizable text sizing
-- Text-to-speech support
-- High contrast modes
-- Gesture customization (swipe, tap, etc.)
-
-#### Gamification
-
-- Daily/weekly streaks
-- Achievement system
-- Progress milestones
-
-#### after you create a file add it in the context.md file so you know the directory structure
-
-This learning flow is designed to maximize engagement and effectiveness while providing flexibility for different learning styles and needs. The premium features enhance the experience through AI-powered personalization and advanced analytics.
+      - `TrueFalseCard.tsx`

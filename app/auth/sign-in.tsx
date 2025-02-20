@@ -24,6 +24,9 @@ import { supabase } from "@/lib/supabase/supabaseClient";
 import { LinearGradient } from "expo-linear-gradient";
 import ResetPasswordModal from "../../components/ResetPasswordModal";
 import { authStorage } from "@/lib/utils/authStorage";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { AUTH_KEYS } from "@/features/auth/constants/index";
+import { useAuth } from "@/features/auth/context/AuthContext";
 
 const styles = StyleSheet.create({
   container: {
@@ -156,6 +159,7 @@ const styles = StyleSheet.create({
 
 export default function SignInScreen() {
   const theme = useTheme();
+  const { signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -178,33 +182,12 @@ export default function SignInScreen() {
   }, []);
 
   const handleSignIn = async () => {
-    Keyboard.dismiss();
-    if (!email.trim() || !password.trim()) {
-      setError("Please fill in all fields");
-      return;
-    }
-
     setLoading(true);
-    setError(null);
-
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password: password.trim(),
-      });
-
-      if (error) throw error;
-
-      // Save persist state if "keep me logged in" is checked
-      if (keepLoggedIn) {
-        await authStorage.setPersist(true);
-      } else {
-        await authStorage.setPersist(false);
-      }
-
+      await signIn(email, password, keepLoggedIn);
       router.replace("/(app)");
     } catch (e) {
-      console.error("Error signing in:", e);
+      console.error("[SignIn] Error:", e);
       setError(e instanceof Error ? e.message : "Failed to sign in");
     } finally {
       setLoading(false);

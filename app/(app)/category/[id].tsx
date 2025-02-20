@@ -2,263 +2,43 @@
  * CategoryDetailScreen - Individual category view with flashcards
  * Route: /category/[id]
  */
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   StyleSheet,
   ScrollView,
-  Animated,
-  TouchableWithoutFeedback,
-  Dimensions,
-  PanResponder,
   TouchableOpacity,
+  Dimensions,
 } from "react-native";
 import {
   Text,
-  Card,
-  FAB,
-  useTheme,
   IconButton,
-  Menu,
-  Searchbar,
   Button,
   ActivityIndicator,
   Surface,
-  SegmentedButtons,
+  Portal,
+  Dialog,
 } from "react-native-paper";
-import PagerView from "react-native-pager-view";
 import { useFocusEffect, router, useLocalSearchParams } from "expo-router";
 import { supabase } from "@/lib/supabase/supabaseClient";
 import type { Category } from "@/types/database";
 import type { Flashcard } from "@/features/cards/types/cards";
 import { LinearGradient } from "expo-linear-gradient";
-import { CategorySections } from "@/features/cards/components/CategorySections";
-import { getCardContent } from "@/features/cards/utils/cardHelpers";
-import { useCardActions } from "@/features/cards/hooks/useCardActions";
 
-const SCREEN_WIDTH = Dimensions.get("window").width;
-const CARD_WIDTH = SCREEN_WIDTH * 0.65;
-const CARD_HEIGHT = CARD_WIDTH * 1.2;
-
-// Add a type for the card types
-type CardType = "classic" | "multiple_choice" | "true_false" | "all";
-
-const FlashcardCard = ({
-  flashcard,
-  onMenuPress,
-  menuVisible,
-  onDelete,
-}: {
-  flashcard: Flashcard;
-  onMenuPress: () => void;
-  menuVisible: boolean;
-  onDelete: (id: string) => void;
-}) => {
-  const { title, content } = getCardContent(flashcard);
-
-  return (
-    <View style={styles.cardWrapper}>
-      <Surface style={styles.cardSurface} elevation={3}>
-        <View style={styles.cardContent}>
-          <View style={styles.cardHeader}>
-            <Text variant="titleLarge" style={styles.cardTerm}>
-              {title}
-            </Text>
-            <Menu
-              visible={menuVisible}
-              onDismiss={onMenuPress}
-              anchor={<IconButton icon="dots-vertical" onPress={onMenuPress} />}
-            >
-              <Menu.Item
-                onPress={() => {
-                  onMenuPress();
-                  router.push(`/(app)/flashcard/edit/${flashcard.id}`);
-                }}
-                title="Edit"
-                leadingIcon="pencil"
-              />
-              <Menu.Item
-                onPress={() => {
-                  onMenuPress();
-                  onDelete(flashcard.id);
-                }}
-                title="Delete"
-                leadingIcon="delete"
-              />
-            </Menu>
-          </View>
-          <Text style={styles.cardDefinition} numberOfLines={3}>
-            {content}
-          </Text>
-        </View>
-      </Surface>
-    </View>
-  );
-};
-
-const FlashcardCarousel = ({
-  flashcards,
-  onMenuPress,
-  menuVisible,
-  onDelete,
-}: {
-  flashcards: Flashcard[];
-  onMenuPress: (id: string | null) => void;
-  menuVisible: string | null;
-  onDelete: (id: string) => void;
-}) => {
-  const [activeIndex, setActiveIndex] = useState(0);
-
-  const onPageSelected = (e: any) => {
-    setActiveIndex(e.nativeEvent.position);
-  };
-
-  return (
-    <View style={styles.carouselContainer}>
-      <Text style={styles.cardCount}>
-        {activeIndex + 1} / {flashcards.length}
-      </Text>
-
-      <PagerView
-        style={styles.pagerView}
-        initialPage={0}
-        onPageSelected={onPageSelected}
-        pageMargin={20}
-        overdrag={true}
-        layoutDirection="ltr"
-      >
-        {flashcards.map((flashcard) => (
-          <View key={flashcard.id} style={styles.pageContainer}>
-            <FlashcardCard
-              flashcard={flashcard}
-              onMenuPress={() => onMenuPress(flashcard.id)}
-              menuVisible={menuVisible === flashcard.id}
-              onDelete={onDelete}
-            />
-          </View>
-        ))}
-      </PagerView>
-    </View>
-  );
-};
-
-const CardTypeSelector = ({
-  selectedType,
-  setSelectedType,
-}: {
-  selectedType: CardType;
-  setSelectedType: (value: CardType) => void;
-}) => (
-  <ScrollView
-    horizontal
-    showsHorizontalScrollIndicator={false}
-    contentContainerStyle={styles.selectorContainer}
-  >
-    <TouchableOpacity
-      onPress={() => setSelectedType("all")}
-      style={[
-        styles.filterButton,
-        selectedType === "all" && styles.filterButtonActive,
-      ]}
-    >
-      <LinearGradient
-        colors={
-          selectedType === "all"
-            ? ["rgba(255,255,255,0.3)", "rgba(255,255,255,0.15)"]
-            : ["rgba(255,255,255,0.15)", "rgba(255,255,255,0.05)"]
-        }
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.filterGradient}
-      >
-        <IconButton icon="cards" size={20} iconColor="white" />
-        <Text style={styles.filterText}>All Cards</Text>
-      </LinearGradient>
-    </TouchableOpacity>
-
-    <TouchableOpacity
-      onPress={() => setSelectedType("classic")}
-      style={[
-        styles.filterButton,
-        selectedType === "classic" && styles.filterButtonActive,
-      ]}
-    >
-      <LinearGradient
-        colors={
-          selectedType === "classic"
-            ? ["rgba(255,255,255,0.3)", "rgba(255,255,255,0.15)"]
-            : ["rgba(255,255,255,0.15)", "rgba(255,255,255,0.05)"]
-        }
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.filterGradient}
-      >
-        <IconButton icon="card-text" size={20} iconColor="white" />
-        <Text style={styles.filterText}>Basic</Text>
-      </LinearGradient>
-    </TouchableOpacity>
-
-    <TouchableOpacity
-      onPress={() => setSelectedType("true_false")}
-      style={[
-        styles.filterButton,
-        selectedType === "true_false" && styles.filterButtonActive,
-      ]}
-    >
-      <LinearGradient
-        colors={
-          selectedType === "true_false"
-            ? ["rgba(255,255,255,0.3)", "rgba(255,255,255,0.15)"]
-            : ["rgba(255,255,255,0.15)", "rgba(255,255,255,0.05)"]
-        }
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.filterGradient}
-      >
-        <IconButton icon="check-circle" size={20} iconColor="white" />
-        <Text style={styles.filterText}>True/False</Text>
-      </LinearGradient>
-    </TouchableOpacity>
-
-    <TouchableOpacity
-      onPress={() => setSelectedType("multiple_choice")}
-      style={[
-        styles.filterButton,
-        selectedType === "multiple_choice" && styles.filterButtonActive,
-      ]}
-    >
-      <LinearGradient
-        colors={
-          selectedType === "multiple_choice"
-            ? ["rgba(255,255,255,0.3)", "rgba(255,255,255,0.15)"]
-            : ["rgba(255,255,255,0.15)", "rgba(255,255,255,0.05)"]
-        }
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.filterGradient}
-      >
-        <IconButton icon="format-list-bulleted" size={20} iconColor="white" />
-        <Text style={styles.filterText}>Multiple Choice</Text>
-      </LinearGradient>
-    </TouchableOpacity>
-  </ScrollView>
-);
+const { width } = Dimensions.get("window");
+const CARD_WIDTH = width - 32;
 
 export default function CategoryDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const theme = useTheme();
   const [category, setCategory] = useState<Category | null>(null);
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
+  const [classicCards, setClassicCards] = useState<Flashcard[]>([]);
+  const [trueFalseCards, setTrueFalseCards] = useState<Flashcard[]>([]);
+  const [multipleChoiceCards, setMultipleChoiceCards] = useState<Flashcard[]>(
+    []
+  );
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [menuVisible, setMenuVisible] = useState<string | null>(null);
-  const [selectedCardType, setSelectedCardType] = useState<CardType>("all");
-
-  const cardTypeSegments = [
-    { value: "classic", label: "Basic" },
-    { value: "multiple_choice", label: "Multiple Choice" },
-    { value: "true_false", label: "True/False" },
-  ];
+  const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -271,14 +51,7 @@ export default function CategoryDetailScreen() {
         .eq("id", id)
         .single();
 
-      if (categoryError) {
-        console.error(
-          "[CategoryDetail] Error fetching category:",
-          categoryError
-        );
-        throw categoryError;
-      }
-      console.log("[CategoryDetail] Category data:", categoryData);
+      if (categoryError) throw categoryError;
       setCategory(categoryData);
 
       const { data: flashcardsData, error: flashcardsError } = await supabase
@@ -287,18 +60,19 @@ export default function CategoryDetailScreen() {
         .eq("category_id", id)
         .order("created_at", { ascending: false });
 
-      if (flashcardsError) {
-        console.error(
-          "[CategoryDetail] Error fetching flashcards:",
-          flashcardsError
-        );
-        throw flashcardsError;
-      }
-      console.log(
-        "[CategoryDetail] Fetched flashcards:",
-        flashcardsData?.length
+      if (flashcardsError) throw flashcardsError;
+
+      const cards = flashcardsData || [];
+      setFlashcards(cards);
+
+      // Group cards by type
+      setClassicCards(cards.filter((card) => card.card_type === "classic"));
+      setTrueFalseCards(
+        cards.filter((card) => card.card_type === "true_false")
       );
-      setFlashcards(flashcardsData || []);
+      setMultipleChoiceCards(
+        cards.filter((card) => card.card_type === "multiple_choice")
+      );
     } catch (error) {
       console.error("[CategoryDetail] Error in fetchData:", error);
     } finally {
@@ -312,17 +86,13 @@ export default function CategoryDetailScreen() {
     }, [id])
   );
 
-  const handleDeleteFlashcard = async (flashcardId: string) => {
+  const handleDelete = async () => {
     try {
-      const { error } = await supabase
-        .from("flashcards")
-        .delete()
-        .eq("id", flashcardId);
-
+      const { error } = await supabase.from("categories").delete().eq("id", id);
       if (error) throw error;
-      await fetchData();
+      router.replace("/(app)/(tabs)/categories");
     } catch (error) {
-      console.error("Error deleting flashcard:", error);
+      console.error("Error deleting category:", error);
     }
   };
 
@@ -334,105 +104,133 @@ export default function CategoryDetailScreen() {
     );
   }
 
-  const filteredFlashcards = flashcards.filter((card) => {
-    const { title, content } = getCardContent(card);
-    const searchLower = searchQuery.toLowerCase();
-    return (
-      title.toLowerCase().includes(searchLower) ||
-      content.toLowerCase().includes(searchLower)
-    );
-  });
-
   return (
-    <LinearGradient
-      colors={["#FF6B6B", "#4158D0"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.container}
-    >
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
+    <LinearGradient colors={["#FF6B6B", "#4158D0"]} style={styles.container}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Header Section */}
+        <View style={styles.header}>
           <View style={styles.titleContainer}>
-            <Text variant="headlineMedium" style={styles.title}>
-              {category.name}
-            </Text>
+            <Text style={styles.title}>{category.name}</Text>
             <IconButton
               icon="pencil"
               mode="contained"
               containerColor="rgba(255,255,255,0.15)"
               iconColor="white"
-              size={20}
-              onPress={() => router.push(`/(app)/category/edit/${id}`)}
+              size={24}
+              style={styles.editButton}
+              onPress={() => router.push(`/category/edit/${id}`)}
             />
           </View>
-          <Button
-            mode="contained"
-            onPress={() => router.push(`/study/${id}`)}
-            style={styles.studyButton}
-            buttonColor="rgba(255,255,255,0.15)"
-            textColor="white"
-            icon="book-open-variant"
-          >
-            Study
-          </Button>
+          <Text style={styles.subtitle}>
+            {flashcards.length} {flashcards.length === 1 ? "card" : "cards"} to
+            study
+          </Text>
         </View>
 
-        <Searchbar
-          placeholder="Search cards..."
-          onChangeText={setSearchQuery}
-          value={searchQuery}
-          style={styles.searchBar}
-          iconColor="rgba(255,255,255,0.7)"
-          placeholderTextColor="rgba(255,255,255,0.5)"
-          inputStyle={styles.searchInput}
-        />
+        {/* Study Modes Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Study Modes</Text>
+          <View style={styles.studyModes}>
+            <Surface style={styles.studyModeCard} elevation={2}>
+              <IconButton icon="cards" size={32} iconColor="#4CAF50" />
+              <Text style={styles.studyModeTitle}>Classic</Text>
+              <Text style={styles.studyModeCount}>
+                {classicCards.length} cards
+              </Text>
+              <Button
+                mode="contained"
+                onPress={() => router.push(`/study/classic/${id}`)}
+                style={styles.studyButton}
+                disabled={classicCards.length === 0}
+              >
+                Study
+              </Button>
+            </Surface>
 
-        <CardTypeSelector
-          selectedType={selectedCardType}
-          setSelectedType={setSelectedCardType}
-        />
-      </View>
+            <Surface style={styles.studyModeCard} elevation={2}>
+              <IconButton icon="check-circle" size={32} iconColor="#2196F3" />
+              <Text style={styles.studyModeTitle}>True/False</Text>
+              <Text style={styles.studyModeCount}>
+                {trueFalseCards.length} cards
+              </Text>
+              <Button
+                mode="contained"
+                onPress={() => router.push(`/study/truefalse/${id}`)}
+                style={styles.studyButton}
+                disabled={trueFalseCards.length === 0}
+              >
+                Study
+              </Button>
+            </Surface>
 
-      <View style={styles.content}>
-        <FlashcardCarousel
-          flashcards={filteredFlashcards.filter(
-            (card) =>
-              selectedCardType === "all" || card.card_type === selectedCardType
-          )}
-          onMenuPress={setMenuVisible}
-          menuVisible={menuVisible}
-          onDelete={handleDeleteFlashcard}
-        />
-      </View>
+            <Surface style={styles.studyModeCard} elevation={2}>
+              <IconButton
+                icon="format-list-checks"
+                size={32}
+                iconColor="#9C27B0"
+              />
+              <Text style={styles.studyModeTitle}>Multiple Choice</Text>
+              <Text style={styles.studyModeCount}>
+                {multipleChoiceCards.length} cards
+              </Text>
+              <Button
+                mode="contained"
+                onPress={() => router.push(`/study/multiplechoice/${id}`)}
+                style={styles.studyButton}
+                disabled={multipleChoiceCards.length === 0}
+              >
+                Study
+              </Button>
+            </Surface>
+          </View>
+        </View>
 
-      <FAB
-        icon="plus"
-        style={styles.fab}
-        onPress={() => {
-          try {
-            const createUrl = `/(app)/flashcard/create/${id}?type=${selectedCardType}`;
-            console.log("[CategoryDetail] Creating card:", {
-              categoryId: id,
-              cardType: selectedCardType,
-              url: createUrl,
-              timestamp: new Date().toISOString(),
-            });
-            router.push(createUrl);
-          } catch (error) {
-            console.error("[CategoryDetail] Failed to create card:", {
-              error,
-              categoryId: id,
-              cardType: selectedCardType,
-              errorMessage:
-                error instanceof Error ? error.message : "Unknown error",
-              timestamp: new Date().toISOString(),
-            });
-          }
-        }}
-        label="Add Card"
-        color="white"
-        customSize={56}
-      />
+        {/* Actions Section */}
+        <View style={styles.actions}>
+          <Button
+            mode="contained"
+            icon="plus"
+            onPress={() => router.push(`/flashcard/create/${id}`)}
+            style={styles.actionButton}
+            contentStyle={styles.actionButtonContent}
+          >
+            Add New Card
+          </Button>
+          <Button
+            mode="outlined"
+            icon="cards"
+            onPress={() => router.push(`/category/${id}/cards`)}
+            style={styles.actionButton}
+            contentStyle={styles.actionButtonContent}
+            textColor="white"
+          >
+            View All Cards
+          </Button>
+        </View>
+      </ScrollView>
+
+      <Portal>
+        <Dialog
+          visible={deleteDialogVisible}
+          onDismiss={() => setDeleteDialogVisible(false)}
+        >
+          <Dialog.Title>Delete Category</Dialog.Title>
+          <Dialog.Content>
+            <Text>
+              Are you sure you want to delete this category? This action cannot
+              be undone and will delete all associated flashcards.
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setDeleteDialogVisible(false)}>
+              Cancel
+            </Button>
+            <Button onPress={handleDelete} textColor="red">
+              Delete
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </LinearGradient>
   );
 }
@@ -446,144 +244,85 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  header: {
-    padding: 16,
-    paddingTop: 24,
-    backgroundColor: "rgba(0, 0, 0, 0.1)",
+  content: {
+    flex: 1,
+    padding: 20,
   },
-  headerTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
+  header: {
+    paddingTop: 40,
+    paddingBottom: 24,
   },
   titleContainer: {
     flexDirection: "row",
     alignItems: "center",
-    flex: 1,
-    marginRight: 16,
+    justifyContent: "space-between",
+    marginBottom: 8,
   },
   title: {
     color: "white",
+    fontSize: 32,
     fontWeight: "bold",
-    flex: 1,
+    opacity: 0.95,
   },
-  studyButton: {
+  editButton: {
+    backgroundColor: "rgba(255,255,255,0.15)",
     borderRadius: 12,
+  },
+  subtitle: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 18,
+    fontWeight: "500",
+  },
+  section: {
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 24,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.2)",
   },
-  searchBar: {
-    elevation: 0,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: 12,
-    height: 48,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
-  },
-  searchInput: {
+  sectionTitle: {
     color: "white",
+    fontSize: 20,
+    fontWeight: "600",
+    marginBottom: 20,
+    opacity: 0.9,
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: 16,
+  studyModes: {
+    gap: 16,
   },
-  segmentedButtons: {
-    marginTop: 16,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: 12,
-    borderColor: "rgba(255, 255, 255, 0.2)",
-  },
-  fab: {
-    position: "absolute",
-    margin: 16,
-    right: 16,
-    bottom: 16,
-    borderRadius: 28,
-    backgroundColor: "rgba(255,255,255,0.15)",
-  },
-  carouselContainer: {
-    height: CARD_HEIGHT + 40,
-    marginVertical: 12,
-  },
-  pagerView: {
-    flex: 1,
-  },
-  pageContainer: {
-    flex: 1,
+  studyModeCard: {
+    backgroundColor: "rgba(255,255,255,0.9)",
+    borderRadius: 16,
+    padding: 20,
     alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 8,
   },
-  cardWrapper: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
-  },
-  cardSurface: {
-    flex: 1,
-    borderRadius: 12,
-    backgroundColor: "white",
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  cardContent: {
-    flex: 1,
-    padding: 12,
-    justifyContent: "space-between",
-  },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 12,
-  },
-  cardTerm: {
+  studyModeTitle: {
     fontSize: 18,
     fontWeight: "600",
-    flex: 1,
-    marginRight: 12,
+    marginTop: 8,
+    color: "#333",
   },
-  cardDefinition: {
+  studyModeCount: {
     fontSize: 14,
-    lineHeight: 20,
-    opacity: 0.7,
-    flex: 1,
+    color: "#666",
+    marginTop: 4,
+    marginBottom: 16,
   },
-  cardCount: {
-    textAlign: "center",
-    marginBottom: 12,
-    fontSize: 14,
-    opacity: 0.7,
-  },
-  selectorContainer: {
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    gap: 12,
-  },
-  filterButton: {
+  studyButton: {
+    width: "100%",
     borderRadius: 12,
-    overflow: "hidden",
-    backgroundColor: "rgba(255,255,255,0.1)",
   },
-  filterButtonActive: {
-    backgroundColor: "rgba(255,255,255,0.2)",
+  actions: {
+    gap: 12,
+    marginBottom: 32,
   },
-  filterGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+  actionButton: {
+    height: 56,
+    borderRadius: 12,
+    borderColor: "rgba(255,255,255,0.3)",
   },
-  filterText: {
-    color: "white",
-    fontSize: 14,
-    fontWeight: "600",
-    marginLeft: 4,
+  actionButtonContent: {
+    height: 56,
   },
 });

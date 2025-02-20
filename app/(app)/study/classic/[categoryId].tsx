@@ -1,5 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, StyleSheet, Dimensions, TouchableOpacity } from "react-native";
+import {
+  View,
+  StyleSheet,
+  Dimensions,
+  TouchableOpacity,
+  Alert,
+} from "react-native";
 import { Text, IconButton, ProgressBar, Button } from "react-native-paper";
 import { useLocalSearchParams, router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
@@ -22,8 +28,8 @@ import {
 } from "@/features/cards/components/SlideCard";
 import type { ClassicCard } from "@/features/cards/types/cards";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { achievementService } from "@/lib/services/achievementService";
 import { useUser } from "@/features/user/context/UserContext";
+import { areDatesConsecutive, isToday } from "@/utils/dateUtils";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const CARD_WIDTH = SCREEN_WIDTH * 0.85;
@@ -111,7 +117,7 @@ export default function ClassicStudyScreen() {
     easing: Easing.bezier(0.25, 0.1, 0.25, 1.0).factory(),
   };
 
-  const { userData } = useUser();
+  const { user } = useUser();
 
   useEffect(() => {
     loadCards();
@@ -144,67 +150,79 @@ export default function ClassicStudyScreen() {
 
   const handleComplete = async () => {
     try {
-      const endTime = Date.now();
-      const startedAt = new Date(startTime.current).toISOString();
-      const endedAt = new Date(endTime).toISOString();
-      const duration = Math.round((endTime - startTime.current) / 1000);
-
-      // Calculate total learned cards
-      const totalLearned = Object.values(cardStatuses).filter(
-        (status) => status === "learned"
-      ).length;
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Save study session
-      const sessionData = {
-        user_id: user.id,
-        category_id: categoryId,
-        started_at: startedAt,
-        ended_at: endedAt,
-        duration: duration,
-        cards_reviewed: cards.length,
-        correct_answers: totalLearned,
-        incorrect_answers: cards.length - totalLearned,
-        study_mode: "classic",
-        accuracy: (totalLearned / cards.length) * 100,
-        created_at: startedAt,
-        updated_at: endedAt,
-      };
-
-      const { data, error } = await supabase
-        .from("study_sessions")
-        .insert(sessionData)
-        .select()
-        .single();
-
-      if (error) {
-        console.error("Error saving session:", error);
+      if (!user?.id) {
+        console.error("No user found");
         return;
       }
 
-      setStats((prev) => ({
-        ...prev,
-        totalReviewed: cards.length,
-        learned: totalLearned,
-        learning: cards.length - totalLearned,
-        totalTime: duration,
-      }));
+      const endTime = Date.now();
+      const duration = Math.floor((endTime - startTime.current) / 1000); // Duration in seconds
+
+      // Get user's current profile data
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("streak_count, last_study_date")
+        .eq("id", user.id)
+        .single();
+
+      const lastStudyDate = profile?.last_study_date
+        ? new Date(profile.last_study_date)
+        : null;
+      const today = new Date();
+      let newStreak = profile?.streak_count || 0;
+
+      // If this is the first study of the day
+      if (!lastStudyDate || !isToday(lastStudyDate)) {
+        if (lastStudyDate && areDatesConsecutive(today, lastStudyDate)) {
+          // Increment streak for consecutive days
+          newStreak += 1;
+        } else {
+          // Start new streak
+          newStreak = 1;
+        }
+
+        // Update profile with new streak and study date
+        await supabase
+          .from("profiles")
+          .update({
+            streak_count: newStreak,
+            last_study_date: today.toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", user.id);
+      }
+
+      // Save study session
+      const { error: sessionError } = await supabase
+        .from("study_sessions")
+        .insert({
+          user_id: user.id,
+          category_id: categoryId,
+          study_mode: "classic",
+          cards_reviewed: cards.length,
+          correct_answers: Object.values(cardStatuses).filter(
+            (status) => status === "learned"
+          ).length,
+          incorrect_answers: Object.values(cardStatuses).filter(
+            (status) => status === "learning"
+          ).length,
+          accuracy: Math.round(
+            (Object.values(cardStatuses).filter(
+              (status) => status === "learned"
+            ).length /
+              cards.length) *
+              100
+          ),
+          duration: duration,
+          created_at: new Date().toISOString(),
+        });
+
+      if (sessionError) throw sessionError;
 
       setShowStats(true);
-
-      if (stats.learned === stats.totalReviewed) {
-        await achievementService.updateProgress(
-          userData.id!,
-          "PERFECT_SESSION",
-          1
-        );
-      }
     } catch (error) {
-      console.error("Error saving study session:", error);
+      console.error("Error completing study session:", error);
+      Alert.alert("Error", "Failed to save study session");
     }
   };
 
@@ -367,7 +385,6 @@ export default function ClassicStudyScreen() {
     setCards(shuffleArray([...cards]));
     setCurrentIndex(0);
     setShowStats(false);
-    setCardStatuses({});
     startTime.current = Date.now();
     setStats({
       totalReviewed: 0,
@@ -634,7 +651,7 @@ const styles = StyleSheet.create({
   },
   flipContainer: {
     flex: 1,
-    perspective: "1000px",
+    transform: [{ rotateY: "0deg" }],
   },
   cardWrapper: {
     width: CARD_WIDTH,

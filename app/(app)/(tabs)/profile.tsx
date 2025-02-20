@@ -7,16 +7,18 @@ import {
   TextInput,
   TouchableOpacity,
   Image,
+  Dimensions,
 } from "react-native";
 import { Text, Button, IconButton, Portal, Dialog } from "react-native-paper";
 import { useFocusEffect } from "expo-router";
-import { supabase } from "../../../lib/supabase/supabaseClient";
+import { supabase } from "@/lib/supabase/supabaseClient";
 import { LinearGradient } from "expo-linear-gradient";
 import { authStorage } from "@/lib/utils/authStorage";
 import { router } from "expo-router";
 import { useAuth } from "@/features/auth/hooks/useAuth";
-import { PremiumManagementService } from "@/features/premium/services/premiumManagementService";
 import * as ImagePicker from "expo-image-picker";
+
+const { width } = Dimensions.get("window");
 
 interface UserProfile {
   id: string;
@@ -24,35 +26,60 @@ interface UserProfile {
   avatar_url: string | null;
 }
 
+// Add type for auth context
+interface AuthUser {
+  id: string;
+  email: string;
+}
+
+interface AuthContextType {
+  session: {
+    user: AuthUser | null;
+  } | null;
+  loading: boolean;
+  signOut: () => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+}
+
 export default function ProfileScreen() {
-  const { user } = useAuth();
+  const auth = useAuth() as AuthContextType;
+  const user = auth.session?.user; // Correctly access user from session
   const [email, setEmail] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
-  const [isPremium, setIsPremium] = useState(false);
   const [displayName, setDisplayName] = useState<string>("");
   const [isEditingName, setIsEditingName] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [tokenBalance, setTokenBalance] = useState<number>(0);
 
   const refreshProfile = async () => {
     try {
       setLoading(true);
-      if (user) {
-        setEmail(user.email || "");
-        const premiumStatus =
-          await PremiumManagementService.getUserPremiumStatus(user.id);
-        setIsPremium(premiumStatus);
+      if (!user?.id) return;
 
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .single();
+      setEmail(user.email || "");
 
-        if (profile) {
-          setDisplayName(profile.display_name || "");
-          setAvatarUrl(profile.avatar_url);
-        }
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+
+      if (profile) {
+        setDisplayName(profile.display_name || "");
+        setAvatarUrl(profile.avatar_url);
+      }
+
+      const { data: tokenData } = await supabase
+        .from("user_tokens")
+        .select("token_balance")
+        .eq("user_id", user.id)
+        .single();
+
+      if (tokenData) {
+        setTokenBalance(tokenData.token_balance);
       }
     } catch (error) {
       console.error("Error refreshing profile:", error);
@@ -67,113 +94,60 @@ export default function ProfileScreen() {
     }, [user])
   );
 
-  const showDeleteConfirmation = () => {
-    Alert.alert(
-      "Delete Account",
-      "Are you sure you want to delete your account?\n\nThis will:\n• Delete all your flashcards\n• Delete all your categories\n• Remove all your data\n• Cancel any premium features\n\nThis action cannot be undone and no refunds will be provided.",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Yes, I understand",
-          style: "destructive",
-          onPress: showFinalWarning,
-        },
-      ]
-    );
-  };
-
-  const showFinalWarning = () => {
-    Alert.alert(
-      "Final Warning",
-      "Are you absolutely sure?\n\nThis will permanently delete your account and all associated data.\n\nType DELETE to confirm.",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Type DELETE",
-          style: "destructive",
-          onPress: () => setDeleteDialogVisible(true),
-        },
-      ]
-    );
-  };
-
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      await authStorage.clear();
-      router.replace("/auth/sign-in");
-    } catch (error) {
-      console.error("Error signing out:", error);
-    }
-  };
-
-  const deleteAccount = async () => {
-    try {
-      if (!user) return;
-
-      await Promise.all([
-        supabase.from("flashcards").delete().eq("user_id", user.id),
-        supabase.from("categories").delete().eq("user_id", user.id),
-        supabase.from("profiles").delete().eq("id", user.id),
-      ]);
-
-      await supabase.auth.admin.deleteUser(user.id);
-      await supabase.auth.signOut();
-      await authStorage.clear();
-
-      router.replace("/auth/sign-in");
-    } catch (error) {
-      console.error("Error deleting account:", error);
+  // Add permission check for image picker
+  const checkImagePermissions = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
       Alert.alert(
-        "Error",
-        "Failed to delete account. Please try again or contact support."
+        "Permission Required",
+        "Please allow access to your photo library to change your profile picture."
       );
+      return false;
     }
+    return true;
   };
 
   const pickImage = async () => {
     try {
+      if (!user?.id) return;
+
+      const hasPermission = await checkImagePermissions();
+      if (!hasPermission) return;
+
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.5,
+        base64: true,
       });
 
       if (!result.canceled && result.assets[0].uri) {
         const uri = result.assets[0].uri;
+        const base64 = result.assets[0].base64;
         const fileExt = uri.substring(uri.lastIndexOf(".") + 1);
-        const fileName = `${user?.id}/${Date.now()}.${fileExt}`;
+        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
-        // Create FormData instead of Blob
-        const formData = new FormData();
-        formData.append("file", {
-          uri,
-          name: fileName,
-          type: `image/${fileExt}`,
-        } as any);
+        if (!base64) {
+          throw new Error("Failed to get image data");
+        }
+
+        // Convert base64 to blob
+        const base64Data = base64.includes("base64,")
+          ? base64
+          : `data:image/${fileExt};base64,${base64}`;
 
         // Upload to Supabase
         const { data, error } = await supabase.storage
           .from("avatars")
-          .upload(fileName, formData, {
+          .upload(fileName, decode(base64Data), {
             contentType: `image/${fileExt}`,
             cacheControl: "3600",
             upsert: true,
           });
 
-        if (error) {
-          console.error("Upload error:", error);
-          throw error;
-        }
+        if (error) throw error;
 
-        // Get the public URL
         const {
           data: { publicUrl },
         } = supabase.storage.from("avatars").getPublicUrl(fileName);
@@ -185,15 +159,12 @@ export default function ProfileScreen() {
             avatar_url: publicUrl,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", user?.id);
+          .eq("id", user.id);
 
-        if (updateError) {
-          console.error("Profile update error:", updateError);
-          throw updateError;
-        }
+        if (updateError) throw updateError;
 
         setAvatarUrl(publicUrl);
-        Alert.alert("Success", "Profile picture updated successfully!");
+        Alert.alert("Success", "Profile picture updated!");
       }
     } catch (error) {
       console.error("Error uploading image:", error);
@@ -206,46 +177,59 @@ export default function ProfileScreen() {
 
   const updateDisplayName = async () => {
     try {
+      if (!user?.id || !displayName.trim()) {
+        Alert.alert("Error", "Please enter a valid name");
+        return;
+      }
+
       const { error } = await supabase
         .from("profiles")
-        .update({ display_name: displayName })
-        .eq("id", user?.id);
+        .update({
+          display_name: displayName.trim(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", user.id);
 
       if (error) throw error;
+
       setIsEditingName(false);
+      Alert.alert("Success", "Name updated successfully!");
     } catch (error) {
       console.error("Error updating name:", error);
-      Alert.alert("Error", "Failed to update display name");
+      Alert.alert("Error", "Failed to update name. Please try again.");
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      await authStorage.clearSession();
+      router.replace("/auth/sign-in");
+    } catch (error) {
+      console.error("Error signing out:", error);
     }
   };
 
   return (
-    <LinearGradient
-      colors={["#FF6B6B", "#4158D0"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.container}
-    >
+    <LinearGradient colors={["#FF6B6B", "#4158D0"]} style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <LinearGradient
-          colors={["rgba(255,255,255,0.2)", "rgba(255,255,255,0.1)"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.profileCard}
-        >
-          <TouchableOpacity onPress={pickImage} style={styles.avatarContainer}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={pickImage}
+            style={styles.avatarContainer}
+            activeOpacity={0.7} // Add this for better touch feedback
+          >
             {avatarUrl ? (
               <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
             ) : (
-              <IconButton
-                icon="account-circle"
-                size={80}
-                iconColor="white"
-                style={styles.avatar}
-              />
+              <View style={styles.defaultAvatar}>
+                <Text style={styles.avatarText}>
+                  {email.charAt(0).toUpperCase()}
+                </Text>
+              </View>
             )}
             <View style={styles.editOverlay}>
-              <IconButton icon="camera" size={20} iconColor="white" />
+              <IconButton icon="camera" size={24} iconColor="white" />
             </View>
           </TouchableOpacity>
 
@@ -256,76 +240,95 @@ export default function ProfileScreen() {
                 onChangeText={setDisplayName}
                 style={styles.nameInput}
                 placeholder="Enter your name"
-                placeholderTextColor="rgba(255,255,255,0.5)"
+                placeholderTextColor="rgba(255,255,255,0.6)"
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={updateDisplayName}
               />
               <IconButton
                 icon="check"
-                size={20}
+                size={24}
                 iconColor="white"
                 onPress={updateDisplayName}
+                style={styles.checkButton}
               />
             </View>
           ) : (
-            <TouchableOpacity onPress={() => setIsEditingName(true)}>
+            <TouchableOpacity
+              onPress={() => setIsEditingName(true)}
+              style={styles.nameContainer}
+            >
               <Text style={styles.displayName}>
                 {displayName || "Add your name"}
               </Text>
+              <IconButton
+                icon="pencil"
+                size={20}
+                iconColor="rgba(255,255,255,0.8)"
+              />
             </TouchableOpacity>
           )}
 
           <Text style={styles.email}>{email}</Text>
-          {isPremium ? (
-            <LinearGradient
-              colors={["#FFD700", "#FFA500"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.premiumBadge}
-            >
-              <Text style={styles.premiumText}>Premium User</Text>
-              <View style={styles.glow} />
-            </LinearGradient>
-          ) : (
-            <View style={styles.freePlan}>
-              <Text style={styles.freePlanText}>Free Plan</Text>
-            </View>
-          )}
-        </LinearGradient>
+        </View>
+
+        <View style={styles.statsCard}>
+          <View style={styles.statItem}>
+            <IconButton icon="star" size={32} iconColor="#FFD700" />
+            <Text style={styles.statValue}>{tokenBalance}</Text>
+            <Text style={styles.statLabel}>Tokens</Text>
+          </View>
+        </View>
 
         <View style={styles.buttonContainer}>
-          {!isPremium && (
-            <Button
-              mode="contained"
-              onPress={() => router.push("/premium/subscribe")}
-              style={styles.upgradeButton}
-              buttonColor="rgba(255,255,255,0.15)"
-              textColor="white"
-              labelStyle={styles.buttonLabel}
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => router.push("/(app)/store/categories")}
+          >
+            <LinearGradient
+              colors={["rgba(255,255,255,0.2)", "rgba(255,255,255,0.1)"]}
+              style={styles.buttonGradient}
             >
-              Upgrade to Premium
-            </Button>
-          )}
+              <IconButton icon="store" size={24} iconColor="white" />
+              <Text style={styles.buttonText}>Visit Store</Text>
+            </LinearGradient>
+          </TouchableOpacity>
 
-          <Button
-            mode="contained"
-            onPress={handleLogout}
-            style={styles.upgradeButton}
-            buttonColor="rgba(255,255,255,0.15)"
-            textColor="white"
-            labelStyle={styles.buttonLabel}
-          >
-            Logout
-          </Button>
+          <TouchableOpacity style={styles.button} onPress={handleLogout}>
+            <LinearGradient
+              colors={["rgba(255,255,255,0.2)", "rgba(255,255,255,0.1)"]}
+              style={styles.buttonGradient}
+            >
+              <IconButton icon="logout" size={24} iconColor="white" />
+              <Text style={styles.buttonText}>Logout</Text>
+            </LinearGradient>
+          </TouchableOpacity>
 
-          <Button
-            mode="contained"
-            onPress={showDeleteConfirmation}
-            style={[styles.upgradeButton, styles.deleteButton]}
-            buttonColor="rgba(255,59,48,0.15)"
-            textColor="#FF3B30"
-            labelStyle={styles.buttonLabel}
+          <TouchableOpacity
+            style={[styles.button, styles.deleteButton]}
+            onPress={() =>
+              Alert.alert(
+                "Delete Account",
+                "This action cannot be undone. Are you sure?",
+                [
+                  { text: "Cancel", style: "cancel" },
+                  {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: () => setDeleteDialogVisible(true),
+                  },
+                ]
+              )
+            }
           >
-            Delete Account
-          </Button>
+            <LinearGradient
+              colors={["rgba(255,59,48,0.2)", "rgba(255,59,48,0.1)"]}
+              style={styles.buttonGradient}
+            >
+              <IconButton icon="delete" size={24} iconColor="#FF3B30" />
+              <Text style={styles.deleteButtonText}>Delete Account</Text>
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
       </ScrollView>
 
@@ -334,18 +337,18 @@ export default function ProfileScreen() {
           visible={deleteDialogVisible}
           onDismiss={() => setDeleteDialogVisible(false)}
         >
-          <Dialog.Title>Type DELETE to confirm</Dialog.Title>
+          <Dialog.Title>Confirm Delete</Dialog.Title>
           <Dialog.Content>
             <TextInput
               style={styles.deleteInput}
+              placeholder="Type DELETE to confirm"
+              autoCapitalize="characters"
               onChangeText={(text) => {
-                if (text.toUpperCase() === "DELETE") {
+                if (text === "DELETE") {
                   setDeleteDialogVisible(false);
-                  deleteAccount();
+                  // Handle delete account
                 }
               }}
-              placeholder="Type DELETE in all caps"
-              autoCapitalize="characters"
             />
           </Dialog.Content>
           <Dialog.Actions>
@@ -365,137 +368,155 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    padding: 16,
   },
-  profileCard: {
-    padding: 24,
-    borderRadius: 28,
+  header: {
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
-    backgroundColor: "rgba(0,0,0,0.1)",
+    paddingTop: 40,
+    paddingBottom: 20,
   },
   avatarContainer: {
     position: "relative",
-    marginVertical: 16,
-  },
-  avatar: {
-    margin: 8,
+    marginBottom: 20,
+    width: 120,
+    height: 120,
   },
   avatarImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 3,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 4,
     borderColor: "rgba(255,255,255,0.2)",
+  },
+  defaultAvatar: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 4,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  avatarText: {
+    fontSize: 48,
+    color: "white",
+    fontWeight: "bold",
   },
   editOverlay: {
     position: "absolute",
     right: -8,
     bottom: -8,
     backgroundColor: "rgba(0,0,0,0.5)",
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 4,
+    zIndex: 1, // Add this to ensure the overlay is clickable
+  },
+  nameContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
   },
   nameEditContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginVertical: 8,
+    marginBottom: 8,
+    paddingHorizontal: 8,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 12,
   },
   nameInput: {
     color: "white",
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: "bold",
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.3)",
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    minWidth: 150,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    minWidth: 200,
+    textAlign: "center",
   },
-  email: {
+  displayName: {
     color: "white",
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: "bold",
-    marginVertical: 8,
-    textShadowColor: "rgba(0, 0, 0, 0.3)",
+    textShadowColor: "rgba(0,0,0,0.3)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
-  premiumBadge: {
-    padding: 12,
-    borderRadius: 8,
-    marginVertical: 8,
-    alignItems: "center",
-    position: "relative",
-    overflow: "hidden",
-  },
-  premiumText: {
-    color: "#FFF",
-    fontSize: 20,
-    fontWeight: "bold",
-    textShadowColor: "rgba(0, 0, 0, 0.3)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-  glow: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(255, 215, 0, 0.2)",
-    borderRadius: 8,
-    shadowColor: "#FFD700",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 15,
-    elevation: 8,
-  },
-  freePlan: {
-    padding: 12,
-    borderRadius: 8,
-    marginVertical: 8,
-    backgroundColor: "#f0f0f0",
-    alignItems: "center",
-  },
-  freePlanText: {
-    color: "#666",
+  email: {
+    color: "rgba(255,255,255,0.8)",
     fontSize: 16,
+  },
+  statsCard: {
+    margin: 20,
+    padding: 20,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 20,
+    flexDirection: "row",
+    justifyContent: "center",
+  },
+  statItem: {
+    alignItems: "center",
+    padding: 10,
+  },
+  statValue: {
+    color: "white",
+    fontSize: 24,
+    fontWeight: "bold",
+    marginVertical: 4,
+  },
+  statLabel: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 14,
   },
   buttonContainer: {
-    marginTop: 24,
-    marginBottom: 16,
-    gap: 12,
+    padding: 20,
+    gap: 16,
   },
-  upgradeButton: {
-    height: 56,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
+  button: {
+    borderRadius: 15,
+    overflow: "hidden",
   },
-  buttonLabel: {
-    fontSize: 16,
-    fontWeight: "bold",
-    letterSpacing: 0.5,
+  buttonGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    paddingHorizontal: 20,
+  },
+  buttonText: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "600",
+    flex: 1,
   },
   deleteButton: {
-    marginTop: 24,
-    borderColor: "rgba(255,59,48,0.3)",
+    marginTop: 20,
+  },
+  deleteButtonText: {
+    color: "#FF3B30",
+    fontSize: 18,
+    fontWeight: "600",
+    flex: 1,
   },
   deleteInput: {
     height: 40,
     borderWidth: 1,
     borderColor: "#ccc",
-    borderRadius: 4,
-    paddingHorizontal: 8,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    marginTop: 8,
   },
-  displayName: {
-    color: "white",
-    fontSize: 20,
-    fontWeight: "bold",
-    marginVertical: 8,
-    textShadowColor: "rgba(0, 0, 0, 0.3)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+  checkButton: {
+    margin: 0,
   },
 });
+
+function decode(base64: string): Uint8Array {
+  const base64Str = base64.includes("base64,")
+    ? base64.split("base64,")[1]
+    : base64;
+  const binaryStr = atob(base64Str);
+  const bytes = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) {
+    bytes[i] = binaryStr.charCodeAt(i);
+  }
+  return bytes;
+}

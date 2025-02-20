@@ -1,12 +1,8 @@
 import React from "react";
 import { Tabs } from "expo-router";
-import { useTheme } from "react-native-paper";
-import Icon from "@expo/vector-icons/MaterialCommunityIcons";
-import { Platform } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 export default function TabsLayout() {
-  const theme = useTheme();
-
   return (
     <Tabs
       screenOptions={{
@@ -16,6 +12,7 @@ export default function TabsLayout() {
           borderTopWidth: 0,
           elevation: 0,
           height: 60,
+          borderTopColor: "transparent",
         },
         tabBarActiveTintColor: "white",
         tabBarInactiveTintColor: "rgba(255,255,255,0.5)",
@@ -23,71 +20,77 @@ export default function TabsLayout() {
           fontSize: 12,
           fontWeight: "bold",
         },
-        lazy: true,
-        tabBarHideOnKeyboard: Platform.OS === "android",
       }}
-      initialRouteName="dashboard"
     >
+      <Tabs.Screen
+        name="index"
+        options={{
+          href: null,
+        }}
+      />
       <Tabs.Screen
         name="categories"
         options={{
           title: "Categories",
           tabBarIcon: ({ color, size }) => (
-            <Icon name="folder" size={size} color={color} />
+            <MaterialCommunityIcons
+              name="folder"
+              size={size || 24}
+              color={color}
+            />
           ),
         }}
       />
-
       <Tabs.Screen
         name="study"
         options={{
           title: "Study",
           tabBarIcon: ({ color, size }) => (
-            <Icon name="book-open-variant" size={size} color={color} />
+            <MaterialCommunityIcons
+              name="book-open-variant"
+              size={size || 24}
+              color={color}
+            />
           ),
         }}
       />
-
       <Tabs.Screen
         name="dashboard"
         options={{
           title: "Dashboard",
           tabBarIcon: ({ color, size }) => (
-            <Icon name="view-dashboard" size={size} color={color} />
+            <MaterialCommunityIcons
+              name="view-dashboard"
+              size={size || 24}
+              color={color}
+            />
           ),
         }}
       />
-
       <Tabs.Screen
         name="stats"
         options={{
           title: "Stats",
           tabBarIcon: ({ color, size }) => (
-            <Icon name="chart-line" size={size} color={color} />
+            <MaterialCommunityIcons
+              name="chart-bar"
+              size={size || 24}
+              color={color}
+            />
           ),
         }}
-        listeners={{
-          blur: () => ({
-            // This will be handled in the stats screen itself
-            // using useFocusEffect
-          }),
-        }}
       />
-
       <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",
           tabBarIcon: ({ color, size }) => (
-            <Icon name="account" size={size} color={color} />
+            <MaterialCommunityIcons
+              name="account-circle"
+              size={size || 24}
+              color={color}
+            />
           ),
-        }}
-      />
-
-      <Tabs.Screen
-        name="index"
-        options={{
-          href: null,
         }}
       />
     </Tabs>

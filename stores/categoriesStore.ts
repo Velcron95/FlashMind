@@ -8,61 +8,76 @@ interface CategoriesState {
   error: Error | null;
   fetchCategories: () => Promise<void>;
   addCategory: (category: Category) => void;
-  deleteCategory: (id: string) => void;
+  updateCategory: (id: string, data: Partial<Category>) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
 }
 
-type SetState = (
-  partial:
-    | CategoriesState
-    | Partial<CategoriesState>
-    | ((state: CategoriesState) => CategoriesState | Partial<CategoriesState>),
-  replace?: boolean
-) => void;
+export const useCategoriesStore = create<CategoriesState>((set) => ({
+  categories: [],
+  loading: false,
+  error: null,
 
-type GetState = () => CategoriesState;
+  fetchCategories: async () => {
+    try {
+      set({ loading: true, error: null });
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
 
-export const useCategoriesStore = create<CategoriesState>(
-  (set: SetState, get: GetState) => ({
-    categories: [],
-    loading: false,
-    error: null,
+      const { data, error } = await supabase
+        .from("categories")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
 
-    fetchCategories: async () => {
-      try {
-        set({ loading: true, error: null });
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user) throw new Error("Not authenticated");
+      if (error) throw error;
+      set({ categories: data || [], loading: false });
+    } catch (error) {
+      set({ error: error as Error, loading: false });
+    }
+  },
 
-        const { data, error } = await supabase
-          .from("categories")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false });
+  addCategory: (category: Category) => {
+    set((state) => ({
+      categories: [category, ...state.categories],
+    }));
+  },
 
-        if (error) throw error;
-        set({ categories: data || [] });
-      } catch (e) {
-        set({
-          error:
-            e instanceof Error ? e : new Error("Failed to fetch categories"),
-        });
-      } finally {
-        set({ loading: false });
-      }
-    },
+  updateCategory: async (id: string, data: Partial<Category>) => {
+    try {
+      const { error } = await supabase
+        .from("categories")
+        .update(data)
+        .eq("id", id);
 
-    addCategory: (category: Category) => {
-      set((state: CategoriesState) => ({
-        categories: [category, ...state.categories],
+      if (error) throw error;
+
+      set((state) => ({
+        categories: state.categories.map((c) =>
+          c.id === id ? { ...c, ...data } : c
+        ),
       }));
-    },
+    } catch (error) {
+      console.error("Error updating category:", error);
+      throw error;
+    }
+  },
 
-    deleteCategory: (id: string) => {
-      set((state: CategoriesState) => ({
-        categories: state.categories.filter((c: Category) => c.id !== id),
+  deleteCategory: async (id: string) => {
+    try {
+      const { error } = await supabase.from("categories").delete().eq("id", id);
+
+      if (error) throw error;
+
+      set((state) => ({
+        categories: state.categories.filter((c) => c.id !== id),
       }));
-    },
-  })
-);
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      throw error;
+    }
+  },
+}));
+
+export default useCategoriesStore;

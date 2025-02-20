@@ -1,11 +1,20 @@
 import type { CardType } from "@/features/cards/types/cards";
 
+export interface User {
+  id: string;
+  email: string;
+  created_at: string;
+  last_login: string;
+  streak_count: number;
+  settings: any;
+}
+
 export interface Profile {
   id: string;
   email: string;
-  is_premium: boolean;
   streak_count: number;
   last_study_date: string | null;
+  token_balance: number;
   created_at: string;
   updated_at: string;
 }
@@ -41,13 +50,10 @@ export interface Flashcard {
 export interface StudySession {
   id: string;
   user_id: string;
-  category_id: string | null;
-  started_at: string;
-  ended_at: string | null;
-  duration: number | null;
-  cards_reviewed: number;
+  category_id: string;
+  cards_studied: number;
   correct_answers: number;
-  incorrect_answers: number;
+  study_duration: number;
   created_at: string;
   updated_at: string;
 }
@@ -66,29 +72,9 @@ export interface Database {
         Update: Partial<Omit<Category, "id" | "user_id">>;
       };
       flashcards: {
-        Row: {
-          id: string;
-          user_id: string;
-          category_id: string;
-          card_type: CardType;
-          term: string | null;
-          definition: string | null;
-          statement: string | null;
-          question: string | null;
-          options: string[] | null;
-          correct_answer: string | null;
-          is_learned: boolean;
-          times_reviewed: number;
-          last_reviewed: string | null;
-          created_at: string;
-          updated_at: string;
-          difficulty_level: number;
-        };
-        Insert: Omit<
-          Database["public"]["Tables"]["flashcards"]["Row"],
-          "id" | "created_at" | "updated_at"
-        >;
-        Update: Partial<Database["public"]["Tables"]["flashcards"]["Insert"]>;
+        Row: Flashcard;
+        Insert: Omit<Flashcard, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<Flashcard, "id" | "user_id">>;
       };
       study_sessions: {
         Row: StudySession;

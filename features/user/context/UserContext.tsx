@@ -1,120 +1,102 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/supabaseClient";
-import { PremiumManagementService } from "@/features/premium/services/premiumManagementService";
-
-interface UserData {
-  id: string | null;
-  email: string | null;
-  avatar_url: string | null;
-  isAdmin: boolean;
-  display_name: string | null;
-}
+import type { Profile } from "@/types/database";
 
 interface UserContextType {
-  userData: UserData;
-  isLoading: boolean;
-  refreshUserData: () => Promise<void>;
+  user: User | null;
+  profile: Profile | null;
+  loading: boolean;
+  error: Error | null;
+  refreshUser: () => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType>({
-  userData: {
-    id: null,
-    email: null,
-    avatar_url: null,
-    isAdmin: false,
-    display_name: null,
-  },
-  isLoading: true,
-  refreshUserData: async () => {},
+  user: null,
+  profile: null,
+  loading: true,
+  error: null,
+  refreshUser: async () => {},
 });
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
-  const [userData, setUserData] = useState<UserData>({
-    id: null,
-    email: null,
-    avatar_url: null,
-    isAdmin: false,
-    display_name: null,
-  });
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
-  const fetchUserData = async () => {
+  const fetchProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select(
+          "id, email, streak_count, last_study_date, token_balance, created_at, updated_at"
+        )
+        .eq("id", userId)
+        .single();
+
+      if (error) throw error;
+      setProfile(data);
+    } catch (err) {
+      console.error("[useUser] Error fetching profile:", err);
+      setError(
+        err instanceof Error ? err : new Error("Failed to fetch profile")
+      );
+    }
+  };
+
+  const refreshUser = async () => {
     try {
       const {
         data: { user },
         error: authError,
       } = await supabase.auth.getUser();
-
-      if (authError) {
-        console.error("Auth error:", authError);
-        setIsLoading(false);
-        return;
-      }
-
+      if (authError) throw authError;
+      setUser(user);
       if (user) {
-        try {
-          const [profileResponse, isAdmin] = await Promise.all([
-            supabase.from("profiles").select("*").eq("id", user.id).single(),
-            PremiumManagementService.isUserAdmin(user.id),
-          ]);
-
-          if (profileResponse.error) {
-            console.error("Profile fetch error:", profileResponse.error);
-            // Set basic user data even if profile fetch fails
-            setUserData({
-              id: user.id,
-              email: user.email || null,
-              avatar_url: null,
-              display_name: null,
-              isAdmin: false,
-            });
-          } else {
-            setUserData({
-              id: user.id,
-              email: user.email || null,
-              avatar_url: profileResponse.data?.avatar_url || null,
-              display_name: profileResponse.data?.display_name || null,
-              isAdmin,
-            });
-          }
-        } catch (error) {
-          console.error("Error in profile/admin check:", error);
-          // Set basic user data on error
-          setUserData({
-            id: user.id,
-            email: user.email || null,
-            avatar_url: null,
-            display_name: null,
-            isAdmin: false,
-          });
-        }
+        await fetchProfile(user.id);
       }
-    } catch (error) {
-      console.error("Error in fetchUserData:", error);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error("Failed to fetch user"));
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchUserData();
+    refreshUser();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
-      fetchUserData();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        await fetchProfile(session.user.id);
+      } else {
+        setProfile(null);
+      }
+      setLoading(false);
     });
 
     return () => {
-      authListener?.subscription.unsubscribe();
+      console.log("[useUser] Cleaning up realtime subscription");
+      subscription.unsubscribe();
     };
   }, []);
 
   return (
     <UserContext.Provider
-      value={{ userData, isLoading, refreshUserData: fetchUserData }}
+      value={{ user, profile, loading, error, refreshUser }}
     >
       {children}
     </UserContext.Provider>
   );
 }
 
-export const useUser = () => useContext(UserContext);
+export function useUser() {
+  const context = useContext(UserContext);
+  if (!context) {
+    throw new Error("useUser must be used within a UserProvider");
+  }
+  return context;
+}

@@ -1,75 +1,55 @@
 import React, { useEffect } from "react";
-import { Stack } from "expo-router";
+import { Stack, Redirect, router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import HeaderBar from "@/components/HeaderBar";
-import { useAuth } from "../../features/auth/hooks/useAuth";
-import type { NavigationState } from "@react-navigation/native";
+import { useAuth } from "@/features/auth/hooks/useAuth";
+import { useUser } from "@/hooks/useUser";
+import { View } from "react-native";
+import { ActivityIndicator } from "react-native-paper";
+import { HeaderBar } from "@/components/HeaderBar";
 
 export default function AppLayout() {
-  const { user } = useAuth();
-  const isDevelopment = process.env.NODE_ENV === "development";
+  const { session, loading: authLoading } = useAuth();
+  const { loading: userLoading } = useUser();
 
   useEffect(() => {
-    console.log("[Navigation] App layout mounted");
-    return () => {
-      console.log("[Navigation] App layout unmounted");
-    };
-  }, []);
+    if (!authLoading && !session) {
+      router.replace("/auth/sign-in");
+    }
+  }, [authLoading, session]);
+
+  // Show loading state while initializing
+  if (authLoading || userLoading) {
+    return (
+      <LinearGradient
+        colors={["#FF6B6B", "#4158D0"]}
+        style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+      >
+        <ActivityIndicator size="large" color="white" />
+      </LinearGradient>
+    );
+  }
+
+  // If no session, don't render anything (useEffect will handle redirect)
+  if (!session) {
+    return null;
+  }
 
   return (
-    <LinearGradient
-      colors={["#FF6B6B", "#4158D0"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={{ flex: 1 }}
-    >
+    <LinearGradient colors={["#FF6B6B", "#4158D0"]} style={{ flex: 1 }}>
+      <HeaderBar />
       <Stack
         screenOptions={{
-          header: () => <HeaderBar />,
+          headerShown: false,
           contentStyle: { backgroundColor: "transparent" },
-          animation: "slide_from_right",
-          animationDuration: 200,
-          presentation: "card",
-          gestureEnabled: true,
-          gestureDirection: "horizontal",
-        }}
-        screenListeners={{
-          state: (e) => {
-            if (e.data?.state) {
-              console.log("[Navigation] Tab state changed:", e.data.state);
-            }
-          },
+          animation: "fade",
         }}
       >
         <Stack.Screen
           name="(tabs)"
-          options={{ headerShown: true }}
-          listeners={{
-            focus: () => {
-              console.log("[Navigation] Tabs focused");
-            },
-            blur: () => {
-              console.log("[Navigation] Tabs blurred");
-            },
+          options={{
+            headerShown: false,
           }}
         />
-        {isDevelopment && (
-          <Stack.Screen
-            name="admin/premium-management"
-            options={{
-              title: "Premium Management",
-              presentation: "modal",
-            }}
-            listeners={{
-              focus: () => {
-                console.log("[Navigation] Admin screen focused");
-              },
-              blur: () => {
-                console.log("[Navigation] Admin screen blurred");
-              },
-            }}
-          />
-        )}
       </Stack>
     </LinearGradient>
   );

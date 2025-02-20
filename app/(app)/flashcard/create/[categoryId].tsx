@@ -1,15 +1,18 @@
 import React, { useState } from "react";
-import { View, StyleSheet, ScrollView, Keyboard } from "react-native";
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  Keyboard,
+  TouchableOpacity,
+} from "react-native";
 import {
   Text,
   TextInput,
   Button,
   useTheme,
   Switch,
-  SegmentedButtons,
-  Surface,
   IconButton,
-  RadioButton,
 } from "react-native-paper";
 import { useLocalSearchParams, router } from "expo-router";
 import { db } from "@/lib/supabase/db";
@@ -48,6 +51,20 @@ type CreateFlashcardData = BaseCreateData &
 
 const MAX_OPTIONS = 4;
 
+const cardTypes = [
+  { value: "classic", label: "Basic", icon: "card-text-outline" },
+  {
+    value: "true_false",
+    label: "T/F",
+    icon: "checkbox-marked-circle-outline",
+  },
+  {
+    value: "multiple_choice",
+    label: "Choice",
+    icon: "format-list-checks",
+  },
+];
+
 export default function CreateFlashcardScreen() {
   const { categoryId } = useLocalSearchParams();
   const theme = useTheme();
@@ -62,7 +79,7 @@ export default function CreateFlashcardScreen() {
 
   // True/False card fields
   const [statement, setStatement] = useState("");
-  const [isTrue, setIsTrue] = useState(false);
+  const [isTrue, setIsTrue] = useState(true);
 
   // Multiple choice card fields
   const [question, setQuestion] = useState("");
@@ -235,63 +252,78 @@ export default function CreateFlashcardScreen() {
     switch (cardType) {
       case "classic":
         return (
-          <View style={styles.formSection}>
-            <Text variant="titleMedium" style={styles.sectionTitle}>
-              Basic Card Details
-            </Text>
+          <>
             <TextInput
-              label="Term"
+              mode="outlined"
+              placeholder="Enter term"
               value={term}
               onChangeText={setTerm}
-              mode="outlined"
               style={styles.input}
-              placeholder="Enter the term"
-              placeholderTextColor="rgba(255, 255, 255, 0.5)"
+              outlineStyle={styles.inputOutlineStyle}
+              contentStyle={styles.inputContentStyle}
+              theme={{
+                colors: {
+                  primary: "white",
+                  text: "white",
+                  placeholder: "rgba(255,255,255,0.6)",
+                  background: "transparent",
+                  onSurfaceVariant: "rgba(255,255,255,0.7)",
+                  outline: "rgba(255,255,255,0.2)",
+                },
+              }}
               textColor="white"
-              outlineColor="rgba(255, 255, 255, 0.2)"
-              activeOutlineColor="white"
             />
             <TextInput
-              label="Definition"
+              mode="outlined"
+              placeholder="Enter definition"
               value={definition}
               onChangeText={setDefinition}
-              mode="outlined"
+              style={[styles.input, styles.multilineInput]}
               multiline
               numberOfLines={4}
-              style={styles.input}
-              placeholder="Enter the definition"
-              placeholderTextColor="rgba(255, 255, 255, 0.5)"
+              outlineStyle={styles.inputOutlineStyle}
+              contentStyle={styles.inputContentStyle}
+              theme={{
+                colors: {
+                  primary: "white",
+                  text: "white",
+                  placeholder: "rgba(255,255,255,0.6)",
+                  background: "transparent",
+                  onSurfaceVariant: "rgba(255,255,255,0.7)",
+                  outline: "rgba(255,255,255,0.2)",
+                },
+              }}
               textColor="white"
-              outlineColor="rgba(255, 255, 255, 0.2)"
-              activeOutlineColor="white"
             />
-          </View>
+          </>
         );
 
       case "true_false":
         return (
-          <View style={styles.formSection}>
-            <Text variant="titleMedium" style={styles.sectionTitle}>
-              True/False Statement
-            </Text>
+          <>
             <TextInput
-              label="Statement"
+              mode="outlined"
+              placeholder="Enter your statement"
               value={statement}
               onChangeText={setStatement}
-              mode="outlined"
+              style={[styles.input, styles.multilineInput]}
               multiline
-              numberOfLines={3}
-              style={styles.input}
-              placeholder="Enter a true/false statement"
-              placeholderTextColor="rgba(255, 255, 255, 0.5)"
+              outlineStyle={styles.inputOutlineStyle}
+              contentStyle={styles.inputContentStyle}
+              theme={{
+                colors: {
+                  primary: "white",
+                  text: "white",
+                  placeholder: "rgba(255,255,255,0.6)",
+                  background: "transparent",
+                  onSurfaceVariant: "rgba(255,255,255,0.7)",
+                  outline: "rgba(255,255,255,0.2)",
+                },
+              }}
               textColor="white"
-              outlineColor="rgba(255, 255, 255, 0.2)"
-              activeOutlineColor="white"
             />
-            <View style={styles.switchContainer}>
-              <Text variant="titleMedium" style={styles.sectionTitle}>
-                Select the correct answer:
-              </Text>
+            <View style={styles.trueFalseContainer}>
+              <Text style={styles.label}>Select the correct answer:</Text>
               <View style={styles.trueFalseButtons}>
                 <Button
                   mode={isTrue ? "contained" : "outlined"}
@@ -301,7 +333,7 @@ export default function CreateFlashcardScreen() {
                     isTrue && styles.selectedButton,
                   ]}
                   textColor="white"
-                  buttonColor={isTrue ? "rgba(255, 255, 255, 0.2)" : undefined}
+                  buttonColor={isTrue ? "rgba(255,255,255,0.2)" : undefined}
                 >
                   True
                 </Button>
@@ -313,104 +345,107 @@ export default function CreateFlashcardScreen() {
                     !isTrue && styles.selectedButton,
                   ]}
                   textColor="white"
-                  buttonColor={!isTrue ? "rgba(255, 255, 255, 0.2)" : undefined}
+                  buttonColor={!isTrue ? "rgba(255,255,255,0.2)" : undefined}
                 >
                   False
                 </Button>
               </View>
             </View>
-          </View>
+          </>
         );
 
       case "multiple_choice":
         return (
-          <View style={styles.formSection}>
-            <Text variant="titleMedium" style={styles.sectionTitle}>
-              Question
-            </Text>
+          <>
             <TextInput
-              label="Question"
+              mode="outlined"
+              placeholder="Enter your question"
               value={question}
               onChangeText={setQuestion}
-              mode="outlined"
-              style={styles.input}
-              placeholder="Enter your question"
-              placeholderTextColor="rgba(255, 255, 255, 0.5)"
+              style={[styles.input, styles.multilineInput]}
+              multiline
+              outlineStyle={styles.inputOutlineStyle}
+              contentStyle={styles.inputContentStyle}
+              theme={{
+                colors: {
+                  primary: "white",
+                  text: "white",
+                  placeholder: "rgba(255,255,255,0.6)",
+                  background: "transparent",
+                  onSurfaceVariant: "rgba(255,255,255,0.7)",
+                  outline: "rgba(255,255,255,0.2)",
+                },
+              }}
               textColor="white"
-              outlineColor="rgba(255, 255, 255, 0.2)"
-              activeOutlineColor="white"
             />
-
             <View style={styles.optionsContainer}>
-              <Text variant="titleMedium" style={styles.sectionTitle}>
-                Answer Options (Maximum {MAX_OPTIONS})
-              </Text>
-
-              <View style={styles.optionsListContainer}>
-                {options.map((option, index) => (
-                  <View key={index} style={styles.optionContainer}>
-                    <IconButton
-                      icon={
-                        correctAnswer === option
-                          ? "check-circle"
-                          : "circle-outline"
-                      }
-                      iconColor="white"
-                      onPress={() => setCorrectAnswer(option)}
-                      style={styles.correctButton}
-                    />
-                    <TextInput
-                      label={`Option ${index + 1}`}
-                      value={option}
-                      onChangeText={(text) => {
-                        const newOptions = [...options];
-                        newOptions[index] = text;
-                        setOptions(newOptions);
-                      }}
-                      mode="outlined"
-                      style={[
-                        styles.optionInput,
-                        { backgroundColor: "rgba(255, 255, 255, 0.05)" },
-                      ]}
-                      placeholderTextColor="rgba(255, 255, 255, 0.5)"
-                      textColor="white"
-                      outlineColor="rgba(255, 255, 255, 0.2)"
-                      activeOutlineColor="white"
-                    />
-                    {options.length > 1 && (
-                      <IconButton
-                        icon="delete"
-                        mode="contained-tonal"
-                        iconColor="white"
-                        containerColor="rgba(255, 255, 255, 0.1)"
-                        onPress={() => {
-                          const newOptions = options.filter(
-                            (_, i) => i !== index
-                          );
-                          setOptions(newOptions);
-                          if (correctAnswer === option) {
-                            setCorrectAnswer("");
-                          }
-                        }}
-                      />
-                    )}
-                  </View>
-                ))}
-
-                {options.length < MAX_OPTIONS && (
-                  <Button
+              {options.map((option, index) => (
+                <View key={index} style={styles.optionContainer}>
+                  <TextInput
                     mode="outlined"
-                    onPress={() => setOptions([...options, ""])}
-                    style={styles.addButton}
-                    icon="plus"
+                    placeholder={`Option ${index + 1}`}
+                    value={option}
+                    onChangeText={(text) => {
+                      const newOptions = [...options];
+                      newOptions[index] = text;
+                      setOptions(newOptions);
+                    }}
+                    style={styles.optionInput}
+                    outlineStyle={styles.inputOutlineStyle}
+                    contentStyle={styles.inputContentStyle}
+                    theme={{
+                      colors: {
+                        primary: "white",
+                        text: "white",
+                        placeholder: "rgba(255,255,255,0.6)",
+                        background: "transparent",
+                        onSurfaceVariant: "rgba(255,255,255,0.7)",
+                        outline: "rgba(255,255,255,0.2)",
+                      },
+                    }}
                     textColor="white"
-                  >
-                    Add Option
-                  </Button>
-                )}
-              </View>
+                  />
+                  <IconButton
+                    icon={
+                      option === correctAnswer
+                        ? "check-circle"
+                        : "circle-outline"
+                    }
+                    iconColor="white"
+                    size={24}
+                    style={styles.correctButton}
+                    onPress={() => setCorrectAnswer(option)}
+                  />
+                  {options.length > 1 && (
+                    <IconButton
+                      icon="close"
+                      iconColor="white"
+                      size={20}
+                      style={styles.removeButton}
+                      onPress={() => {
+                        const newOptions = options.filter(
+                          (_, i) => i !== index
+                        );
+                        setOptions(newOptions);
+                        if (correctAnswer === option) setCorrectAnswer("");
+                      }}
+                    />
+                  )}
+                </View>
+              ))}
+              {options.length < MAX_OPTIONS && (
+                <Button
+                  mode="outlined"
+                  onPress={() => setOptions([...options, ""])}
+                  style={styles.addButton}
+                  textColor="white"
+                  icon="plus"
+                >
+                  Add Option
+                </Button>
+              )}
             </View>
-          </View>
+          </>
         );
     }
   };
@@ -427,16 +462,32 @@ export default function CreateFlashcardScreen() {
           <Text variant="titleLarge" style={styles.title}>
             Create {cardType.replace("_", " ")} Card
           </Text>
-          <SegmentedButtons
-            value={cardType}
-            onValueChange={(value) => setCardType(value as CardType)}
-            buttons={[
-              { value: "classic", label: "Basic" },
-              { value: "true_false", label: "True/False" },
-              { value: "multiple_choice", label: "Multiple Choice" },
-            ]}
-            style={styles.cardTypeSelector}
-          />
+          <View style={styles.cardTypeSelector}>
+            {cardTypes.map((type) => (
+              <TouchableOpacity
+                key={type.value}
+                style={[
+                  styles.cardTypeButton,
+                  cardType === type.value && styles.cardTypeButtonSelected,
+                ]}
+                onPress={() => setCardType(type.value as CardType)}
+              >
+                <IconButton
+                  icon={type.icon}
+                  size={24}
+                  iconColor={cardType === type.value ? "#4158D0" : "white"}
+                />
+                <Text
+                  style={[
+                    styles.cardTypeText,
+                    cardType === type.value && styles.cardTypeTextSelected,
+                  ]}
+                >
+                  {type.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         {renderCardTypeForm()}
@@ -493,7 +544,34 @@ const styles = StyleSheet.create({
     color: "white",
   },
   cardTypeSelector: {
-    marginBottom: 8,
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 24,
+    padding: 8,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 16,
+  },
+  cardTypeButton: {
+    flex: 1,
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    gap: 4,
+  },
+  cardTypeButtonSelected: {
+    backgroundColor: "white",
+  },
+  cardTypeText: {
+    color: "white",
+    fontSize: 13,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  cardTypeTextSelected: {
+    color: "#4158D0",
   },
   formSection: {
     marginBottom: 24,
@@ -570,5 +648,31 @@ const styles = StyleSheet.create({
     color: "red",
     textAlign: "center",
     marginBottom: 16,
+  },
+  multilineInput: {
+    minHeight: 120,
+  },
+  inputOutlineStyle: {
+    borderRadius: 12,
+  },
+  inputContentStyle: {
+    paddingHorizontal: 16,
+  },
+  trueFalseContainer: {
+    backgroundColor: "rgba(255,255,255,0.12)",
+    padding: 20,
+    borderRadius: 16,
+    marginTop: 12,
+  },
+  label: {
+    color: "white",
+    fontSize: 16,
+    marginBottom: 12,
+    opacity: 0.9,
+  },
+  removeButton: {
+    margin: 0,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 8,
   },
 });

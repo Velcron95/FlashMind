@@ -1,94 +1,53 @@
-import { useEffect } from "react";
-import { Stack } from "expo-router";
-import { useColorScheme } from "react-native";
-import { PaperProvider, MD3DarkTheme, MD3LightTheme } from "react-native-paper";
-import { getInitialSession } from "@/lib/supabase/supabaseClient";
-import { AuthProvider } from "../features/auth/context/AuthContext";
-import * as SplashScreen from "expo-splash-screen";
-import { LogBox } from "react-native";
-import { authStorage } from "@/lib/utils/authStorage";
-import { supabase } from "@/lib/supabase/supabaseClient";
-import { router } from "expo-router";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
+import React, { useEffect } from "react";
+import { Stack, Slot } from "expo-router";
+import { PaperProvider } from "react-native-paper";
+import { AuthProvider } from "@/features/auth/context/AuthContext";
 import { UserProvider } from "@/features/user/context/UserContext";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
+import * as SplashScreen from "expo-splash-screen";
+import { supabase } from "@/lib/supabase/supabaseClient";
+import { authService } from "@/features/auth/services/authService";
 
-// Keep the splash screen visible while we fetch resources
+// Keep splash screen visible while we initialize
 SplashScreen.preventAutoHideAsync();
 
-// Ignore specific warnings if needed
-LogBox.ignoreLogs([
-  "Non-serializable values were found in the navigation state",
-]);
-
-export const unstable_settings = {
-  // Remove this or change to "dashboard"
-  // initialRouteName: "(tabs)",
-};
-
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
   useEffect(() => {
-    const setupApp = async () => {
+    // Initialize auth state
+    const initAuth = async () => {
       try {
-        console.log("[Navigation] App starting...");
+        // Get initial session and persistence state
+        const currentSession = await authService.getSession();
+        const shouldPersist = await authService.getPersistState();
 
-        // Try to restore the session first
-        const savedSession = await authStorage.getSession();
-        if (savedSession) {
-          await supabase.auth.setSession(savedSession);
+        if (currentSession && !shouldPersist) {
+          // If we have a session but shouldn't persist, sign out
+          await authService.signOut();
         }
 
-        const isPersisted = await authStorage.getPersist();
-        if (isPersisted) {
-          const {
-            data: { session },
-          } = await supabase.auth.getSession();
-          if (session) {
-            console.log("[Auth] Session found, redirecting to app");
-            router.replace("/(app)/(tabs)/dashboard");
-          } else {
-            console.log("[Auth] No session found, redirecting to login");
-            router.replace("/auth/sign-in");
-          }
-        } else {
-          console.log("[Auth] No persistence requested, redirecting to login");
-          router.replace("/auth/sign-in");
+        if (currentSession) {
+          console.log(
+            "[Root] Initial session found for:",
+            currentSession.user.email
+          );
         }
-
-        await SplashScreen.hideAsync();
       } catch (error) {
-        console.error("[Navigation] Setup error:", error);
-        router.replace("/auth/sign-in");
+        console.error("[Root] Error initializing auth:", error);
+      } finally {
+        // Hide splash screen once we're done
+        await SplashScreen.hideAsync();
       }
     };
 
-    setupApp();
+    initAuth();
   }, []);
 
   return (
-    <ErrorBoundary>
-      <GestureHandlerRootView style={{ flex: 1 }}>
+    <PaperProvider>
+      <AuthProvider>
         <UserProvider>
-          <AuthProvider>
-            <PaperProvider
-              theme={colorScheme === "dark" ? MD3DarkTheme : MD3LightTheme}
-            >
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                }}
-                initialRouteName="(app)"
-              >
-                <Stack.Screen name="(app)" />
-                <Stack.Screen name="(auth)" />
-                <Stack.Screen name="admin" options={{ headerShown: false }} />
-              </Stack>
-            </PaperProvider>
-          </AuthProvider>
+          <Slot />
         </UserProvider>
-      </GestureHandlerRootView>
-    </ErrorBoundary>
+      </AuthProvider>
+    </PaperProvider>
   );
 }

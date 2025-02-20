@@ -1,47 +1,53 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 import { supabase } from "@/lib/supabase/supabaseClient";
-import { User } from "@supabase/supabase-js";
+import type { Profile } from "@/types/database";
 
 export function useUser() {
-  const [user, setUser] = useState<User | null>(null);
-  const [isPremium, setIsPremium] = useState(false);
+  const { session } = useAuth();
+  const [user, setUser] = useState(session?.user ?? null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const checkPremiumStatus = async (userId: string) => {
-    try {
-      // Check premium status from profiles table
-      const { data: profile, error } = await supabase
-        .from("profiles")
-        .select("is_premium")
-        .eq("id", userId)
-        .single();
-
-      console.log("[useUser] Profile data:", profile);
-      if (error) {
-        console.error("[useUser] Error fetching profile:", error);
-        return false;
-      }
-
-      const newPremiumStatus = Boolean(profile?.is_premium);
-      console.log("[useUser] New premium status:", newPremiumStatus);
-      return newPremiumStatus;
-    } catch (error) {
-      console.error("[useUser] Error checking premium status:", error);
-      return false;
-    }
-  };
-
-  // Set up realtime subscription
   useEffect(() => {
-    if (!user) return;
+    setUser(session?.user ?? null);
+  }, [session]);
 
+  useEffect(() => {
+    if (!user) {
+      setProfile(null);
+      setLoading(false);
+      return;
+    }
+
+    const fetchProfile = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select(
+            "id, email, streak_count, last_study_date, token_balance, created_at, updated_at"
+          )
+          .eq("id", user.id)
+          .single();
+
+        if (error) throw error;
+        setProfile(data);
+      } catch (err) {
+        console.error("[useUser] Error fetching profile:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
+
+    // Set up realtime subscription
     console.log(
       "[useUser] Setting up realtime subscription for user:",
       user.id
     );
-
     const subscription = supabase
-      .channel("profile-changes")
+      .channel(`public:profiles:id=eq.${user.id}`)
       .on(
         "postgres_changes",
         {
@@ -51,10 +57,8 @@ export function useUser() {
           filter: `id=eq.${user.id}`,
         },
         async (payload) => {
-          console.log("[useUser] Received profile change:", payload);
-          const newStatus = await checkPremiumStatus(user.id);
-          console.log("[useUser] Updating premium status to:", newStatus);
-          setIsPremium(newStatus);
+          console.log("[useUser] Profile data:", payload.new);
+          setProfile(payload.new as Profile);
         }
       )
       .subscribe();
@@ -65,62 +69,9 @@ export function useUser() {
     };
   }, [user]);
 
-  // Initial setup and auth changes
-  useEffect(() => {
-    let isMounted = true;
-
-    const setup = async () => {
-      // Get initial user state
-      const {
-        data: { user: currentUser },
-      } = await supabase.auth.getUser();
-
-      if (!isMounted) return;
-
-      setUser(currentUser);
-      if (currentUser) {
-        const isPremiumUser = await checkPremiumStatus(currentUser.id);
-        console.log("[useUser] Initial premium status:", isPremiumUser);
-        if (isMounted) {
-          setIsPremium(isPremiumUser);
-        }
-      }
-      if (isMounted) {
-        setLoading(false);
-      }
-    };
-
-    setup();
-
-    // Subscribe to auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!isMounted) return;
-
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        const isPremiumUser = await checkPremiumStatus(session.user.id);
-        console.log("[useUser] Auth change premium status:", isPremiumUser);
-        if (isMounted) {
-          setIsPremium(isPremiumUser);
-        }
-      } else {
-        if (isMounted) {
-          setIsPremium(false);
-        }
-      }
-    });
-
-    return () => {
-      isMounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-
   return {
     user,
-    isPremium,
+    profile,
     loading,
   };
 }

@@ -23,19 +23,19 @@ import {
   Card,
   IconButton,
   Chip,
+  SegmentedButtons,
 } from "react-native-paper";
 import { router, useLocalSearchParams } from "expo-router";
-import { useCategories, type Category } from "@/hooks/useCategories";
 import { LinearGradient } from "expo-linear-gradient";
 import { adjustColor } from "@/lib/utils/colors";
-import { AICategoryAssistant } from "@/features/ai/components/AICategoryAssistant";
-import { supabase } from "@/lib/supabase/supabaseClient";
-import { AICategoryCreator } from "@/features/ai/components/AICategoryCreator";
-import { useUser } from "../../../hooks/useUser";
-import { PremiumStatus } from "@/components/PremiumStatus";
 import { db } from "@/lib/supabase/db";
-import { useCategoriesStore } from "@/stores/categoriesStore";
+import { supabase } from "@/lib/supabase/supabaseClient";
 import * as Haptics from "expo-haptics";
+import { useUser } from "@/hooks/useUser";
+import { useStoreCategoriesStore } from "@/stores/storeCategoriesStore";
+import { useCategoriesStore } from "@/stores/categoriesStore";
+import type { Category } from "@/types/database";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
 const COLUMN_COUNT = 2;
@@ -48,23 +48,21 @@ const CARD_WIDTH = (width - SPACING * (COLUMN_COUNT + 1)) / COLUMN_COUNT;
  *
  * Features:
  * - Grid view of all user's categories
- * - Create new categories (manual or AI-assisted)
+ * - Create new categories
  * - Edit/delete existing categories
  * - Navigate to category details
- * - Premium features integration
+ * - Store integration for purchasing categories
  * - Real-time updates via Supabase
  */
 export default function CategoryBrowserScreen() {
   const theme = useTheme();
-  const { user, isPremium, loading: userLoading } = useUser();
-  const [canAccessAI, setCanAccessAI] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(
-    null
-  );
-  const { categories, loading, error, fetchCategories, addCategory } =
-    useCategoriesStore();
-  const [activeFilter, setActiveFilter] = useState("all");
+  const { user } = useUser();
+  const { categories, loading, error, fetchCategories } = useCategoriesStore();
+  const { categories: storeCategories, loading: storeLoading } =
+    useStoreCategoriesStore();
+  const [activeTab, setActiveTab] = useState("owned");
   const { studyMode } = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (!user) return;
@@ -131,64 +129,27 @@ export default function CategoryBrowserScreen() {
     await fetchCategories();
   }, [fetchCategories]);
 
-  const refreshPremiumStatus = useCallback(async () => {
-    console.log("[Categories] Refreshing premium status");
-    setCanAccessAI(false);
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    setCanAccessAI(Boolean(isPremium));
-  }, [isPremium]);
-
-  const handleAICreate = async () => {
-    console.log(
-      "[Categories] Handling AI create. Premium status:",
-      canAccessAI
-    );
-
-    // Refresh premium status before checking
-    await refreshPremiumStatus();
-
-    if (user && canAccessAI) {
-      console.log("[Categories] Routing to AI chat");
-      router.push({
-        pathname: "/(app)/ai-chat",
-        params: {
-          animation: "slide_from_bottom",
-        },
-      });
-    } else {
-      console.log("[Categories] Routing to subscription");
-      router.push("/(app)/premium/subscribe");
-    }
-  };
-
-  useEffect(() => {
-    console.log("[Categories] Premium status changed:", isPremium);
-    setCanAccessAI(Boolean(isPremium));
-  }, [isPremium]);
-
   const handleCategorySelect = (categoryId: string) => {
-    // Normal category navigation
-    router.push({
-      pathname: "/(app)/category/[id]",
-      params: { id: categoryId },
-    });
+    try {
+      // Navigate to the category view screen
+      router.push(`/category/${categoryId}`); // Simplified path
+    } catch (error) {
+      console.error("[Categories] Navigation error:", error);
+      Alert.alert("Error", "Failed to open category. Please try again.");
+    }
   };
 
   if (loading && !categories.length) {
     return (
-      <View
-        style={[styles.centered, { backgroundColor: theme.colors.background }]}
-      >
-        <ActivityIndicator size="large" />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="white" />
       </View>
     );
   }
 
   if (error) {
     return (
-      <View
-        style={[styles.centered, { backgroundColor: theme.colors.background }]}
-      >
+      <View style={styles.loadingContainer}>
         <Text variant="bodyLarge" style={styles.errorText}>
           {error.message}
         </Text>
@@ -203,68 +164,37 @@ export default function CategoryBrowserScreen() {
       end={{ x: 1, y: 1 }}
       style={styles.container}
     >
-      <PremiumStatus />
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <Text variant="headlineMedium" style={styles.title}>
-          Browse all
+          Categories
         </Text>
+
+        <View style={styles.tabContainer}>
+          <SegmentedButtons
+            value={activeTab}
+            onValueChange={setActiveTab}
+            buttons={[
+              {
+                value: "owned",
+                label: "My Categories",
+                icon: "folder",
+                style: styles.tabButton,
+              },
+              {
+                value: "store",
+                label: "Store",
+                icon: "store",
+                style: styles.tabButton,
+              },
+            ]}
+            style={styles.segmentedButtons}
+          />
+        </View>
       </View>
 
-      <View style={styles.filterContainer}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterScroll}
-        >
-          <Chip
-            selected={activeFilter === "all"}
-            onPress={() => setActiveFilter("all")}
-            style={[
-              styles.filterChip,
-              activeFilter === "all" && styles.filterChipActive,
-            ]}
-            textStyle={[
-              styles.filterChipText,
-              activeFilter === "all" && styles.filterChipTextActive,
-            ]}
-          >
-            All
-          </Chip>
-          <Chip
-            selected={activeFilter === "recent"}
-            onPress={() => setActiveFilter("recent")}
-            style={[
-              styles.filterChip,
-              activeFilter === "recent" && styles.filterChipActive,
-            ]}
-            textStyle={[
-              styles.filterChipText,
-              activeFilter === "recent" && styles.filterChipTextActive,
-            ]}
-          >
-            Recent
-          </Chip>
-          <Chip
-            selected={activeFilter === "favorites"}
-            onPress={() => setActiveFilter("favorites")}
-            style={[
-              styles.filterChip,
-              activeFilter === "favorites" && styles.filterChipActive,
-            ]}
-            textStyle={[
-              styles.filterChipText,
-              activeFilter === "favorites" && styles.filterChipTextActive,
-            ]}
-          >
-            Favorites
-          </Chip>
-        </ScrollView>
-      </View>
-
-      {categories.length > 0 ? (
+      {activeTab === "owned" ? (
         <FlatList
           data={categories}
-          keyExtractor={(item) => item.id}
           numColumns={COLUMN_COUNT}
           contentContainerStyle={styles.list}
           columnWrapperStyle={styles.row}
@@ -285,15 +215,13 @@ export default function CategoryBrowserScreen() {
             return (
               <Card
                 style={styles.card}
-                onPress={() => {
-                  handleCategorySelect(item.id);
-                }}
+                onPress={() => handleCategorySelect(item.id)}
                 onLongPress={() => {
-                  try {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  } catch (error) {
-                    console.log("Haptics not available");
-                  }
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
+                    () => {
+                      console.log("Haptics not available");
+                    }
+                  );
                   handleDelete(item);
                 }}
                 delayLongPress={300}
@@ -313,46 +241,31 @@ export default function CategoryBrowserScreen() {
               </Card>
             );
           }}
+          keyExtractor={(item) => item.id}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No categories yet</Text>
+              <Text style={styles.emptySubtext}>
+                Create a category to get started
+              </Text>
+            </View>
+          }
         />
       ) : (
-        <View style={styles.emptyContainer}>
-          <Text variant="bodyLarge" style={styles.emptyText}>
-            No categories yet
-          </Text>
-          <Text variant="bodyMedium" style={styles.emptySubtext}>
-            Create a category to get started
-          </Text>
+        <View style={styles.storeContainer}>
+          <Text style={styles.comingSoon}>Store Coming Soon!</Text>
         </View>
       )}
 
-      <View style={styles.fabContainer}>
-        <FAB
-          icon="robot"
-          style={[
-            styles.fab,
-            styles.aiFab,
-            { backgroundColor: "rgba(255,255,255,0.15)" },
-          ]}
-          onPress={async () => {
-            console.log("[Categories] FAB pressed. Current status:", {
-              user: Boolean(user),
-              premium: canAccessAI,
-              loading: userLoading,
-            });
-            await handleAICreate();
-          }}
-          label="AI Create"
-          color="white"
-          disabled={userLoading}
-        />
+      {activeTab === "owned" && (
         <FAB
           icon="plus"
-          style={[styles.fab, { backgroundColor: "rgba(255,255,255,0.15)" }]}
-          onPress={() => router.push("/(app)/category/create")}
+          style={styles.fab}
+          onPress={() => router.push("/category/create")}
           label="Add Category"
           color="white"
         />
-      </View>
+      )}
     </LinearGradient>
   );
 }
@@ -361,18 +274,33 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#FF6B6B",
+  },
   header: {
     padding: 16,
-    paddingTop: 24,
+    gap: 16,
+    backgroundColor: "rgba(0, 0, 0, 0.1)",
   },
   title: {
     color: "white",
     fontWeight: "bold",
+    fontSize: 34,
+    marginBottom: 8,
   },
-  centered: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+  tabContainer: {
+    marginBottom: 8,
+  },
+  segmentedButtons: {
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 12,
+  },
+  tabButton: {
+    borderColor: "rgba(255, 255, 255, 0.2)",
+    borderWidth: 1,
   },
   list: {
     padding: SPACING,
@@ -410,65 +338,41 @@ const styles = StyleSheet.create({
     letterSpacing: 0.75,
     paddingHorizontal: 16,
   },
-  fabContainer: {
-    position: "absolute",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    bottom: 16,
-    left: 16,
-    right: 16,
-  },
   fab: {
-    borderRadius: 28,
-  },
-  aiFab: {
-    backgroundColor: "rgba(147, 51, 234, 0.3)", // Slight purple tint for AI button
+    position: "absolute",
+    right: 16,
+    bottom: 16,
+    backgroundColor: "rgba(255,255,255,0.2)",
   },
   emptyContainer: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: 32,
   },
   emptyText: {
+    color: "white",
     fontSize: 18,
     fontWeight: "bold",
-    color: "white",
     marginBottom: 8,
   },
   emptySubtext: {
-    opacity: 0.7,
+    color: "rgba(255,255,255,0.7)",
     textAlign: "center",
-    color: "white",
   },
   errorText: {
     color: "#FF6B6B",
     textAlign: "center",
     margin: 16,
   },
-  filterContainer: {
-    paddingHorizontal: 16,
-    marginBottom: 16,
+  storeContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  filterScroll: {
-    paddingRight: 16, // Extra space at the end
-    gap: 8,
-  },
-  filterChip: {
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
-    height: 36,
-  },
-  filterChipActive: {
-    backgroundColor: "rgba(255,255,255,0.25)",
-    borderColor: "rgba(255,255,255,0.4)",
-  },
-  filterChipText: {
-    color: "rgba(255,255,255,0.8)",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  filterChipTextActive: {
+  comingSoon: {
     color: "white",
+    fontSize: 24,
+    fontWeight: "bold",
   },
 });

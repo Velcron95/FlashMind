@@ -8,39 +8,30 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/FlashMindLogo.jpg",
-  userInterfaceStyle: "automatic",
+  userInterfaceStyle: "light",
   splash: {
     image: "./assets/FlashMindLogo.jpg",
     resizeMode: "contain",
-    backgroundColor: "#1A1A1A",
+    backgroundColor: "#ffffff",
   },
   assetBundlePatterns: ["**/*"],
   ios: {
     supportsTablet: true,
-    bundleIdentifier: "com.flashmind.app",
+    bundleIdentifier: "com.yourcompany.flashmind",
   },
   android: {
     adaptiveIcon: {
       foregroundImage: "./assets/FlashMindLogo.jpg",
-      backgroundColor: "#1A1A1A",
+      backgroundColor: "#ffffff",
     },
-    package: "com.flashmind.app",
+    package: "com.yourcompany.flashmind",
   },
-  plugins: [
-    "expo-secure-store",
-    [
-      "expo-build-properties",
-      {
-        android: {
-          usesCleartextTraffic: true,
-        },
-      },
-    ],
-  ],
+  web: {
+    favicon: "./assets/FlashMindLogo.jpg",
+  },
   extra: {
-    eas: {
-      projectId: "aa552198-3989-4ec5-92e5-8413b23a994e",
-    },
+    supabaseUrl: process.env.SUPABASE_URL,
+    supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
   },
   owner: "velcron",
 });
